@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+﻿import { NextResponse } from "next/server"
 import type { ResultSetHeader, RowDataPacket } from "mysql2"
 import { badRequest, getUserId, serverError } from "@/lib/api-utils"
 import { generateAssistantReply, getPromptTemplates, getUsageSummary, getTemplateById } from "@/lib/ai"

@@ -17,7 +17,7 @@ TaskFlow AI uses MySQL through XAMPP. The schema is maintained in `schema.sql`; 
 Demo login:
 
 - Email: `asha@example.com`
-- Password: `Taskflow123!`
+- Password: `TaskFlow123!`
 
 ## Rebuild Test Database
 

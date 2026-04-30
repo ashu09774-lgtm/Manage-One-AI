@@ -1,4 +1,4 @@
-import Link from "next/link"
+﻿import Link from "next/link"
 import { Zap } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 

@@ -1,4 +1,4 @@
-import type { ResultSetHeader, RowDataPacket } from "mysql2"
+﻿import type { ResultSetHeader, RowDataPacket } from "mysql2"
 import { db } from "@/lib/db"
 
 export type PromptTemplate = {

@@ -3,11 +3,13 @@
 This file is the master execution checklist for the full project.
 
 How to use this file:
+
 - Mark each item from `- [ ]` to `- [x]` when completed.
 - Keep implementation work aligned to the build order at the bottom.
 - Treat this file as the source of truth for project progress.
 
 Current note:
+
 - Google OAuth code is implemented, but the checklist stays open until `NEXT_PUBLIC_GOOGLE_CLIENT_ID` is added and verified against your Google Cloud project.
 - Audit status for sections `1-25`: Sections `1-4` and `6-25` are complete in the current codebase. Section `5` is complete except for Google OAuth verification, which needs a real Google Cloud OAuth client ID.
 
@@ -70,6 +72,7 @@ Current note:
 - [x] Auth error handling
 
 Open item note:
+
 - `Google OAuth sign in using Google Cloud` has frontend and backend code in place, but it is not fully complete until `NEXT_PUBLIC_GOOGLE_CLIENT_ID` is configured and tested with a real Google Cloud OAuth app.
 
 ## 6. Dashboard Module
@@ -125,6 +128,7 @@ Open item note:
 - [x] AI usage logging
 
 Implementation note:
+
 - Gemini integration is wired through `GEMINI_API_KEY` and `GEMINI_MODEL`. When no provider key is configured, the assistant automatically falls back to local workspace-aware responses so the module still works in development.
 
 ## 10. Multi-Agent AI System
@@ -139,6 +143,7 @@ Implementation note:
 - [x] Agent failure handling
 
 Implementation note:
+
 - Multi-agent runs execute in the assistant module as persisted orchestration jobs with four ordered agents, per-step trace records, stored final summaries, and failure capture when an individual agent step breaks.
 
 ## 11. Automation Module
@@ -152,6 +157,7 @@ Implementation note:
 - [x] Automation management UI
 
 Implementation note:
+
 - The current automation module supports workspace-scoped rule building, manual execution, persisted run logs, due-soon and overdue reminders, recurring task cloning, completion follow-up task creation, and heuristic workflow suggestions based on live workspace data.
 
 ## 12. Real-Time Collaboration
@@ -166,6 +172,7 @@ Implementation note:
 - [x] Real-time notification delivery
 
 Implementation note:
+
 - Collaboration now includes a live workspace chat, a shared workspace brief, SSE-based real-time workspace streams, mention-triggered notifications, presence heartbeats, and a unified activity feed. Task comments also support mention notifications.
 
 ## 13. Notes and Docs Module
@@ -178,6 +185,7 @@ Implementation note:
 - [x] Notes versioning or revision support
 
 Implementation note:
+
 - Notes and docs now support workspace-scoped markdown editing, project documentation pages, task links, workspace live-update broadcasts, library search and filters, and revision snapshots for every saved content change.
 
 ## 14. Analytics Module
@@ -191,6 +199,7 @@ Implementation note:
 - [x] Analytics empty and loading states
 
 Implementation note:
+
 - Analytics now includes workspace and date-range filters, productivity KPI cards, task completion charts, priority breakdowns, workspace progress, team performance metrics, heuristic AI-style insights, CSV report export, and dedicated loading and empty states.
 
 ## 15. Notifications Module
@@ -203,6 +212,7 @@ Implementation note:
 - [x] Mark as read and clear actions
 
 Implementation note:
+
 - Notifications now include a dedicated notification center, live in-app delivery, deadline reminder generation, assignment and automation alerts, account-level notification preferences, filters, unread summaries, mark-read actions, and clear individual/read notification workflows.
 
 ## 16. Search and Smart Filters
@@ -215,6 +225,7 @@ Implementation note:
 - [x] AI semantic search
 
 Implementation note:
+
 - Search now includes a dedicated global search page, header search navigation, unified API results for tasks/projects/workspaces/notes/docs, task status and priority filters, workspace/type filters, smart intent filters, and AI-style semantic scoring with result summaries.
 
 ## 17. Settings Module
@@ -228,6 +239,7 @@ Implementation note:
 - [x] Profile management
 
 Implementation note:
+
 - Settings now includes connected profile management, account preferences, theme persistence, workspace identity settings, workspace team role controls, notification preferences, password changes, and a two-factor preference toggle.
 
 ## 18. Backend and API Completion
@@ -247,6 +259,7 @@ Implementation note:
 - [x] API authentication middleware
 
 Implementation note:
+
 - Backend APIs now cover user profile/security, auth/session, task CRUD and attachments/comments, workspaces/projects/members, AI assistant and agents, collaboration streams, automation rules/runs, notes/docs, notifications, analytics, and global search. Shared API utilities now provide session-aware user resolution, JSON parsing, validation helpers, standardized 400/401/403/404/500 responses, and centralized error handling. The app proxy now protects dashboard pages and non-auth API routes with session middleware.
 
 ## 19. Database Completion
@@ -259,6 +272,7 @@ Implementation note:
 - [x] Test database setup
 
 Implementation note:
+
 - Database completion now includes a finalized MySQL schema, foreign-key relationships, idempotent demo seed data, upload storage backup support, database backup/restore scripts, npm database scripts, and a resettable `taskflow_auth_test` setup.
 
 ## 20. UI and UX Completion
@@ -274,6 +288,7 @@ Implementation note:
 - [x] Mobile usability pass
 
 Implementation note:
+
 - UI/UX completion now includes a responsive dashboard shell with mobile navigation, connected header/sidebar actions, reachable landing/footer/auth links, viewport-safe dialogs, consistent compact card radii, global keyboard focus styling, skip-to-content navigation, password toggle labels, offline-safe system fonts, and verified production route generation.
 
 ## 21. Testing
@@ -288,6 +303,7 @@ Implementation note:
 - [x] Production build testing
 
 Implementation note:
+
 - Testing now includes a Node smoke suite for login/auth, API route coverage, database schema/seed/backup workflow, collaboration realtime wiring, AI fallback and multi-agent traces, end-to-end route connectivity, regression guards, and production build readiness. TypeScript checking and production build testing are exposed through npm scripts and documented in `docs/TESTING.md`.
 
 ## 22. Final Deliverables
@@ -303,6 +319,7 @@ Implementation note:
 - [x] Deployment-ready package
 
 Implementation note:
+
 - Final deliverables now include a running verified local app, report-ready architecture and UML Mermaid diagrams, implementation results, screenshot capture guide and captions, demo presentation outline, GitHub issue/PR templates, README deliverables index, deployment package documentation, and a dedicated deliverables smoke test.
 
 ## 23. Final Product Goals
@@ -316,6 +333,7 @@ Implementation note:
 - [x] SaaS-style full stack product
 
 Implementation note:
+
 - Final product goals are now mapped to concrete implementation evidence in `docs/PRODUCT_GOALS.md` and verified by `npm.cmd run test:goals`, covering the AI productivity platform, task management, multi-agent workspace, collaboration, workflow automation, analytics, and SaaS-style full-stack product goals.
 
 ## 24. Recommended Build Order
@@ -332,6 +350,7 @@ Implementation note:
 - [x] Final polish
 
 Implementation note:
+
 - Recommended build order is now documented in `docs/BUILD_ORDER.md` with a dependency flow diagram and phase-by-phase implementation evidence. The sequence is verified by `npm.cmd run test:build-order`.
 
 ## 25. Current Progress Notes
@@ -342,4 +361,5 @@ Implementation note:
 - [x] Keep this file updated after every major feature milestone
 
 Implementation note:
+
 - Current progress is now summarized in `docs/PROGRESS_STATUS.md`, including completed sections, the remaining external Google OAuth verification item, next practical validation steps, and the full verification command set. The status is verified by `npm.cmd run test:progress`.

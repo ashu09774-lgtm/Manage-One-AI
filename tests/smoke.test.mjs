@@ -1,4 +1,4 @@
-import assert from "node:assert/strict"
+﻿import assert from "node:assert/strict"
 import { existsSync } from "node:fs"
 import { readFile, readdir } from "node:fs/promises"
 import path from "node:path"
@@ -93,7 +93,7 @@ test("database testing: schema, seeds, backups, and test database scripts are pr
 
   assert.ok((schema.match(/FOREIGN KEY/g) ?? []).length >= 25)
   assert.match(seed, /asha@example\.com/)
-  assert.match(seed, /Taskflow|taskflowseed0001/)
+  assert.match(seed, /TaskFlow|TaskFlowseed0001/)
   assert.equal(exists("database", "backup.ps1"), true)
   assert.equal(exists("database", "restore.ps1"), true)
   assert.equal(exists("database", "test-db.ps1"), true)

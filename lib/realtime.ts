@@ -1,4 +1,4 @@
-type EventPayload = Record<string, unknown>
+﻿type EventPayload = Record<string, unknown>
 
 type Subscriber = {
   id: string

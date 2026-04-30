@@ -4,7 +4,7 @@
 
 - Application entry point: `/`
 - Protected dashboard: `/dashboard`
-- Demo seed user: `asha@example.com` / `Taskflow123!`
+- Demo seed user: `asha@example.com` / `TaskFlow123!`
 - Start command: `npm.cmd run dev`
 
 ## Documentation

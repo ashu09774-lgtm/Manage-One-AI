@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
@@ -7,7 +7,21 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { Bot, CheckSquare, Clock, FolderKanban, Plus, TrendingUp, Users } from "lucide-react"
+import {
+  ArrowRight,
+  ArrowUpRight,
+  Bot,
+  CheckCircle2,
+  CheckSquare,
+  Clock,
+  FolderKanban,
+  Layers,
+  Plus,
+  Sparkles,
+  TrendingUp,
+  Users,
+  Zap,
+} from "lucide-react"
 
 interface UserData {
   id: string
@@ -44,12 +58,19 @@ interface DashboardData {
   }>
 }
 
-const priorityVariant = {
-  low: "secondary",
-  medium: "secondary",
-  high: "default",
-  urgent: "destructive",
-} as const
+const priorityConfig = {
+  low: { variant: "secondary" as const, className: "bg-muted text-muted-foreground" },
+  medium: { variant: "secondary" as const, className: "bg-chart-4/10 text-chart-4 border-chart-4/20" },
+  high: { variant: "default" as const, className: "bg-primary/10 text-primary border-primary/20" },
+  urgent: { variant: "destructive" as const, className: "bg-destructive/10 text-destructive border-destructive/20" },
+}
+
+const statusConfig: Record<string, { label: string; dot: string; bg: string }> = {
+  todo: { label: "To Do", dot: "bg-muted-foreground", bg: "bg-muted/50 text-muted-foreground" },
+  "in-progress": { label: "In Progress", dot: "bg-blue-500", bg: "bg-blue-500/10 text-blue-400" },
+  review: { label: "Review", dot: "bg-amber-500", bg: "bg-amber-500/10 text-amber-400" },
+  done: { label: "Done", dot: "bg-emerald-500", bg: "bg-emerald-500/10 text-emerald-400" },
+}
 
 export default function DashboardPage() {
   const [user, setUser] = useState<UserData | null>(null)
@@ -93,94 +114,216 @@ export default function DashboardPage() {
   const stats = data?.stats ?? { workspaces: 0, tasks: 0, members: 0, completionRate: 0 }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {greeting()}, {user?.name?.split(" ")[0] || "User"}
-          </h1>
-          <p className="text-muted-foreground">Here is what is happening with your workspace today.</p>
-        </div>
-        <div className="flex gap-2">
-          <Link href="/dashboard/assistant">
-            <Button variant="outline" className="gap-2"><Bot className="h-4 w-4" />AI Assistant</Button>
-          </Link>
-          <Link href="/dashboard/tasks">
-            <Button className="gap-2"><Plus className="h-4 w-4" />New Task</Button>
-          </Link>
+    <div className="space-y-8">
+      {/* Hero Header */}
+      <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-br from-primary/[0.08] via-card to-chart-2/[0.06] p-6 sm:p-8">
+        {/* Decorative orbs */}
+        <div className="pointer-events-none absolute -right-20 -top-20 h-60 w-60 rounded-full bg-primary/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-chart-2/10 blur-3xl" />
+
+        <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
+              <Sparkles className="h-3 w-3" />
+              AI-Powered Dashboard
+            </div>
+            <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
+              {greeting()}, {user?.name?.split(" ")[0] || "User"} 👋
+            </h1>
+            <p className="mt-1 text-muted-foreground">Here&apos;s what&apos;s happening across your workspaces today.</p>
+          </div>
+          <div className="flex gap-2">
+            <Link href="/dashboard/assistant">
+              <Button variant="outline" className="gap-2 rounded-xl border-primary/20 bg-primary/5 text-primary hover:bg-primary/10">
+                <Bot className="h-4 w-4" />
+                AI Assistant
+              </Button>
+            </Link>
+            <Link href="/dashboard/tasks">
+              <Button className="gap-2 rounded-xl shadow-lg shadow-primary/20">
+                <Plus className="h-4 w-4" />
+                New Task
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
 
-      {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+      {error && <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>}
 
+      {/* Metric Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard title="Active Workspaces" value={stats.workspaces} icon={FolderKanban} />
-        <MetricCard title="Total Tasks" value={stats.tasks} icon={CheckSquare} />
-        <MetricCard title="Team Members" value={stats.members} icon={Users} />
-        <MetricCard title="Completion Rate" value={`${stats.completionRate}%`} icon={TrendingUp} />
+        <MetricCard
+          title="Active Workspaces"
+          value={stats.workspaces}
+          icon={FolderKanban}
+          gradient="from-primary/10 to-primary/5"
+          iconBg="bg-primary/10 text-primary"
+          isLoading={isLoading}
+        />
+        <MetricCard
+          title="Total Tasks"
+          value={stats.tasks}
+          icon={CheckSquare}
+          gradient="from-chart-2/10 to-chart-2/5"
+          iconBg="bg-chart-2/10 text-chart-2"
+          isLoading={isLoading}
+        />
+        <MetricCard
+          title="Team Members"
+          value={stats.members}
+          icon={Users}
+          gradient="from-chart-5/10 to-chart-5/5"
+          iconBg="bg-chart-5/10 text-chart-5"
+          isLoading={isLoading}
+        />
+        <MetricCard
+          title="Completion Rate"
+          value={`${stats.completionRate}%`}
+          icon={TrendingUp}
+          gradient="from-chart-3/10 to-chart-3/5"
+          iconBg="bg-chart-3/10 text-chart-3"
+          isLoading={isLoading}
+          showProgress
+          progressValue={stats.completionRate}
+        />
       </div>
 
+      {/* Main Content Grid */}
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Recent Tasks</CardTitle>
-            <CardDescription>Your latest task updates from the database</CardDescription>
+        {/* Recent Tasks */}
+        <Card className="card-glow lg:col-span-2 overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+                  <Layers className="h-4 w-4 text-primary" />
+                </div>
+                Recent Tasks
+              </CardTitle>
+              <CardDescription className="mt-1">Latest task updates across your workspaces</CardDescription>
+            </div>
+            <Link href="/dashboard/tasks">
+              <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground hover:text-foreground">
+                View All <ArrowRight className="h-3 w-3" />
+              </Button>
+            </Link>
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <p className="text-muted-foreground">Loading tasks...</p>
-            ) : !data?.recentTasks.length ? (
-              <p className="text-muted-foreground">No tasks yet. Create your first task to populate this view.</p>
-            ) : (
-              <div className="space-y-4">
-                {data.recentTasks.map((task) => (
-                  <div key={task.id} className="flex items-center justify-between rounded-lg border border-border p-3">
+              <div className="space-y-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="flex items-center justify-between rounded-xl bg-muted/30 p-4">
                     <div className="flex items-center gap-3">
-                      <div className={`h-2 w-2 rounded-full ${task.status === "done" ? "bg-green-500" : task.status === "in-progress" ? "bg-blue-500" : "bg-muted-foreground"}`} />
-                      <div>
-                        <p className="font-medium">{task.title}</p>
-                        <p className="text-sm text-muted-foreground">{task.workspace}</p>
+                      <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-muted" />
+                      <div className="space-y-2">
+                        <div className="h-4 w-40 animate-pulse rounded bg-muted" />
+                        <div className="h-3 w-24 animate-pulse rounded bg-muted" />
                       </div>
                     </div>
-                    <Badge variant={priorityVariant[task.priority]}>{task.priority}</Badge>
+                    <div className="h-5 w-16 animate-pulse rounded-full bg-muted" />
                   </div>
                 ))}
+              </div>
+            ) : !data?.recentTasks.length ? (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/60 bg-muted/10 py-12 text-center">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                  <CheckSquare className="h-7 w-7 text-primary" />
+                </div>
+                <h3 className="mb-1 font-semibold">No tasks yet</h3>
+                <p className="mb-4 max-w-xs text-sm text-muted-foreground">Create your first task to start tracking your work and see progress here.</p>
+                <Link href="/dashboard/tasks">
+                  <Button size="sm" className="gap-1.5 rounded-lg">
+                    <Plus className="h-3.5 w-3.5" />
+                    Create First Task
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {data.recentTasks.map((task) => {
+                  const status = statusConfig[task.status] ?? statusConfig.todo
+                  const priority = priorityConfig[task.priority] ?? priorityConfig.medium
+                  return (
+                    <div
+                      key={task.id}
+                      className="group flex items-center justify-between rounded-xl border border-border/40 bg-background/50 p-3.5 transition-all duration-200 hover:border-border hover:bg-muted/30 hover:shadow-sm"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${status.dot} ring-4 ring-background`} />
+                        <div className="min-w-0">
+                          <p className="truncate font-medium group-hover:text-primary transition-colors">{task.title}</p>
+                          <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="truncate">{task.workspace}</span>
+                            <span className="text-border">·</span>
+                            <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium ${status.bg}`}>
+                              {status.label}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <Badge variant={priority.variant} className={`ml-2 flex-shrink-0 rounded-md border text-[11px] ${priority.className}`}>
+                        {task.priority}
+                      </Badge>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </CardContent>
         </Card>
 
-        <Card>
+        {/* Team Activity */}
+        <Card className="card-glow overflow-hidden">
           <CardHeader>
-            <CardTitle>Team Activity</CardTitle>
-            <CardDescription>Recent activity from workspace events</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-chart-5/10">
+                <Zap className="h-4 w-4 text-chart-5" />
+              </div>
+              Activity
+            </CardTitle>
+            <CardDescription>Recent workspace events</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <p className="text-muted-foreground">Loading activity...</p>
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <div className="h-9 w-9 animate-pulse rounded-full bg-muted" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-3.5 w-full animate-pulse rounded bg-muted" />
+                      <div className="h-3 w-20 animate-pulse rounded bg-muted" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : !data?.activity.length ? (
-              <div className="flex items-start gap-3 text-muted-foreground">
-                <Avatar className="h-8 w-8"><AvatarFallback>DB</AvatarFallback></Avatar>
-                <div>
-                  <p className="text-sm">No activity events have been recorded yet.</p>
-                  <p className="mt-1 flex items-center text-xs"><Clock className="mr-1 h-3 w-3" />This panel updates as tasks and workspaces change.</p>
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/60 bg-muted/10 py-10 text-center">
+                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-chart-5/10">
+                  <Clock className="h-6 w-6 text-chart-5" />
                 </div>
+                <p className="text-sm font-medium">No activity yet</p>
+                <p className="mt-1 max-w-[200px] text-xs text-muted-foreground">
+                  Activity events will appear here as tasks and workspaces change.
+                </p>
               </div>
             ) : (
               <div className="space-y-4">
                 {data.activity.map((item) => (
-                  <div key={item.id} className="flex items-start gap-3">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback>{item.user.split(" ").map((part) => part[0]).join("").slice(0, 2)}</AvatarFallback>
+                  <div key={item.id} className="group flex items-start gap-3 rounded-lg p-1.5 transition-colors hover:bg-muted/20">
+                    <Avatar className="h-9 w-9 border-2 border-background shadow-sm">
+                      <AvatarFallback className="bg-gradient-to-br from-primary/20 to-chart-2/20 text-xs font-semibold">
+                        {item.user.split(" ").map((part) => part[0]).join("").slice(0, 2)}
+                      </AvatarFallback>
                     </Avatar>
-                    <div className="space-y-1">
-                      <p className="text-sm">
-                        <span className="font-medium">{item.user}</span>{" "}
+                    <div className="flex-1 space-y-1 min-w-0">
+                      <p className="text-sm leading-snug">
+                        <span className="font-semibold">{item.user}</span>{" "}
                         <span className="text-muted-foreground">{item.action}</span>{" "}
-                        <span className="font-medium">{item.subject}</span>
+                        <span className="font-medium text-primary">{item.subject}</span>
                       </p>
-                      <p className="flex items-center text-xs text-muted-foreground">
-                        <Clock className="mr-1 h-3 w-3" />
+                      <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <Clock className="h-3 w-3" />
                         {formatRelativeTime(item.createdAt)}
                       </p>
                     </div>
@@ -192,26 +335,87 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Active Workspaces</CardTitle>
-          <CardDescription>Progress across your real workspaces</CardDescription>
+      {/* Active Workspaces */}
+      <Card className="card-glow overflow-hidden">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-chart-2/10">
+                <FolderKanban className="h-4 w-4 text-chart-2" />
+              </div>
+              Active Workspaces
+            </CardTitle>
+            <CardDescription className="mt-1">Progress across your workspaces</CardDescription>
+          </div>
+          <Link href="/dashboard/workspaces">
+            <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground hover:text-foreground">
+              Manage <ArrowRight className="h-3 w-3" />
+            </Button>
+          </Link>
         </CardHeader>
         <CardContent>
-          {!data?.projects.length ? (
-            <p className="text-muted-foreground">No workspaces yet.</p>
+          {isLoading ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="rounded-xl border border-border/40 bg-muted/10 p-5">
+                  <div className="mb-4 h-5 w-32 animate-pulse rounded bg-muted" />
+                  <div className="mb-4 h-2 w-full animate-pulse rounded-full bg-muted" />
+                  <div className="flex justify-between">
+                    <div className="h-4 w-16 animate-pulse rounded bg-muted" />
+                    <div className="h-4 w-20 animate-pulse rounded bg-muted" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : !data?.projects.length ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/60 bg-muted/10 py-12 text-center">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-chart-2/10">
+                <FolderKanban className="h-7 w-7 text-chart-2" />
+              </div>
+              <h3 className="mb-1 font-semibold">No workspaces yet</h3>
+              <p className="mb-4 max-w-xs text-sm text-muted-foreground">Create a workspace to organize your projects, tasks, and team collaboration.</p>
+              <Link href="/dashboard/workspaces">
+                <Button size="sm" className="gap-1.5 rounded-lg">
+                  <Plus className="h-3.5 w-3.5" />
+                  Create Workspace
+                </Button>
+              </Link>
+            </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {data.projects.map((project) => (
-                <div key={project.id} className="rounded-lg border border-border p-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <h3 className="font-semibold">{project.name}</h3>
-                    <span className="text-sm text-muted-foreground">{project.progress}%</span>
+                <div
+                  key={project.id}
+                  className="group relative overflow-hidden rounded-xl border border-border/40 bg-gradient-to-br from-card to-background/50 p-5 transition-all duration-300 hover:border-border hover:shadow-lg hover:shadow-primary/5"
+                >
+                  {/* Top gradient accent */}
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="font-semibold group-hover:text-primary transition-colors">{project.name}</h3>
+                    <span className="flex items-center gap-1 text-sm font-bold text-primary">
+                      {project.progress}%
+                      <ArrowUpRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+                    </span>
                   </div>
-                  <Progress value={project.progress} className="mb-3 h-2" />
+
+                  {/* Custom gradient progress bar */}
+                  <div className="mb-4 h-2 overflow-hidden rounded-full bg-muted/50">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-primary to-chart-2 transition-all duration-700 ease-out"
+                      style={{ width: `${project.progress}%` }}
+                    />
+                  </div>
+
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>{project.tasks} tasks</span>
-                    <span>{project.members} members</span>
+                    <span className="flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      {project.tasks} tasks
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5" />
+                      {project.members} members
+                    </span>
                   </div>
                 </div>
               ))}
@@ -223,14 +427,53 @@ export default function DashboardPage() {
   )
 }
 
-function MetricCard({ title, value, icon: Icon }: { title: string; value: string | number; icon: React.ElementType }) {
+function MetricCard({
+  title,
+  value,
+  icon: Icon,
+  gradient,
+  iconBg,
+  isLoading,
+  showProgress,
+  progressValue,
+}: {
+  title: string
+  value: string | number
+  icon: React.ElementType
+  gradient: string
+  iconBg: string
+  isLoading: boolean
+  showProgress?: boolean
+  progressValue?: number
+}) {
   return (
-    <Card>
+    <Card className={`card-glow group relative overflow-hidden bg-gradient-to-br ${gradient}`}>
+      {/* Hover glow line */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
+        <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${iconBg} transition-transform duration-300 group-hover:scale-110`}>
+          <Icon className="h-4.5 w-4.5" />
+        </div>
       </CardHeader>
-      <CardContent><div className="text-2xl font-bold">{value}</div></CardContent>
+      <CardContent>
+        {isLoading ? (
+          <div className="h-8 w-20 animate-pulse rounded-lg bg-muted" />
+        ) : (
+          <>
+            <div className="text-3xl font-bold tracking-tight">{value}</div>
+            {showProgress && progressValue !== undefined && (
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted/50">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-chart-3 to-chart-3/60 transition-all duration-1000 ease-out"
+                  style={{ width: `${Math.min(progressValue, 100)}%` }}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
     </Card>
   )
 }
