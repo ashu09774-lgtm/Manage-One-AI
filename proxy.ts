@@ -4,6 +4,34 @@ import { sessionCookieName, verifySessionToken } from "@/lib/session"
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
+  const method = request.method.toUpperCase()
+
+  // CSRF Protection
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(method) && pathname.startsWith("/api/")) {
+    const origin = request.headers.get("origin")
+    const host = request.headers.get("host")
+
+    if (!origin) {
+      const referer = request.headers.get("referer")
+      if (referer) {
+        try {
+          const refererUrl = new URL(referer)
+          if (refererUrl.host !== host) {
+            return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 })
+          }
+        } catch {}
+      }
+    } else {
+      try {
+        const originUrl = new URL(origin)
+        if (originUrl.host !== host) {
+          return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 })
+        }
+      } catch {
+        return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 })
+      }
+    }
+  }
 
   if (!pathname.startsWith("/dashboard") && !pathname.startsWith("/api")) {
     return NextResponse.next()

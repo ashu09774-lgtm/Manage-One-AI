@@ -1,10 +1,12 @@
-﻿import type { Metadata, Viewport } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
+import { Toaster } from "@/components/ui/sonner"
+import { ScrollToTop } from "@/components/ui/scroll-to-top"
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'TaskFlow AI - Smart Workspace for Teams',
+  title: 'Manage One AI - Smart Workspace for Teams',
   description: 'AI-powered productivity and collaboration platform. Manage tasks, automate workflows, and collaborate with your team in real-time.',
   keywords: ['productivity', 'collaboration', 'AI', 'task management', 'automation', 'workspace'],
 }
@@ -23,7 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning className="dark">
-      <body className="bg-background font-sans antialiased">
+      <body className="bg-background font-sans antialiased" suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
@@ -32,6 +34,8 @@ export default function RootLayout({
         >
           {children}
         </ThemeProvider>
+        <ScrollToTop />
+        <Toaster />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

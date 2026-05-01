@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -97,7 +97,7 @@ export default function AssistantPage() {
   const [user, setUser] = useState<UserData | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
-  const [provider, setProvider] = useState("taskflow-local")
+  const [provider, setProvider] = useState("manage-one-local")
   const [selectedTemplateId, setSelectedTemplateId] = useState("default-assistant")
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState("all")
   const [templates, setTemplates] = useState<PromptTemplate[]>([])
@@ -113,10 +113,12 @@ export default function AssistantPage() {
   const [isSending, setIsSending] = useState(false)
   const [isSavingTemplate, setIsSavingTemplate] = useState(false)
   const [error, setError] = useState("")
+  const [streamingMessage, setStreamingMessage] = useState<string | null>(null)
+  const [isCreatingTasks, setIsCreatingTasks] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("taskflow_user")
+    const storedUser = localStorage.getItem("manageone_user")
     if (storedUser) setUser(JSON.parse(storedUser))
   }, [])
 
@@ -204,32 +206,65 @@ export default function AssistantPage() {
     setIsSending(true)
     setError("")
 
-    const response = await fetch("/api/assistant", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: user.id,
-        content: messageText,
-        templateId,
-        workspaceId: selectedWorkspaceId === "all" ? null : Number(selectedWorkspaceId),
-      }),
-    })
-    const data = await response.json()
+    // Optimistically add user message
+    const userMessageId = Date.now()
+    setMessages((current) => [
+      ...current,
+      { id: userMessageId, role: "user", content: messageText, createdAt: new Date().toISOString() },
+    ])
 
-    if (response.ok) {
-      setMessages((current) => [...current, ...data.messages])
-      setProvider(data.provider ?? provider)
+    try {
+      const response = await fetch("/api/assistant/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          content: messageText,
+          templateId,
+          workspaceId: selectedWorkspaceId === "all" ? null : Number(selectedWorkspaceId),
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error ?? "Streaming failed")
+      }
+
+      if (!response.body) throw new Error("No response body")
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let accumulated = ""
+      setStreamingMessage("")
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+        accumulated += chunk
+        setStreamingMessage(accumulated)
+      }
+
+      // Once done, add the final message to the list and clear streaming state
+      setMessages((current) => [
+        ...current,
+        { id: Date.now() + 1, role: "assistant", content: accumulated, createdAt: new Date().toISOString() },
+      ])
+      setStreamingMessage(null)
+      
       setUsage((current) => ({
+        ...current,
         requests: current.requests + 1,
         inputChars: current.inputChars + messageText.length,
-        outputChars: current.outputChars + String(data.messages?.[1]?.content ?? "").length,
+        outputChars: current.outputChars + accumulated.length,
         lastUsedAt: new Date().toISOString(),
       }))
-    } else {
-      setError(data.error ?? "Could not save message")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not complete AI request")
+    } finally {
+      setIsSending(false)
     }
-
-    setIsSending(false)
   }
 
   async function saveTemplate() {
@@ -340,6 +375,48 @@ export default function AssistantPage() {
     setIsLaunchingRun(false)
   }
 
+  async function convertToTasks(content: string) {
+    if (!user?.id || isCreatingTasks) return
+    
+    const jsonMatch = content.match(/```json\s+([\s\S]+?)\s+```/)
+    if (!jsonMatch) return
+
+    try {
+      setIsCreatingTasks(true)
+      const tasksToCreate = JSON.parse(jsonMatch[1])
+      if (!Array.isArray(tasksToCreate)) throw new Error("Invalid task format")
+
+      const workspaceId = selectedWorkspaceId === "all" ? null : Number(selectedWorkspaceId)
+      if (!workspaceId) {
+        toast.error("Please select a workspace first")
+        return
+      }
+
+      const response = await fetch("/api/tasks/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          workspaceId,
+          tasks: tasksToCreate.map((t) => ({
+            title: t.title,
+            priority: t.priority || "medium",
+            description: t.description || "",
+            status: "todo",
+          })),
+        }),
+      })
+
+      if (!response.ok) throw new Error("Could not create tasks")
+      
+      toast.success(`Successfully created ${tasksToCreate.length} tasks!`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to parse or create tasks")
+    } finally {
+      setIsCreatingTasks(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -402,7 +479,7 @@ export default function AssistantPage() {
                       <Bot className="h-5 w-5 text-primary-foreground" />
                     </div>
                     <div>
-                      <CardTitle className="text-lg">TaskFlow AI</CardTitle>
+                      <CardTitle className="text-lg">Manage One AI</CardTitle>
                       <CardDescription>
                         {selectedTemplate ? `${selectedTemplate.name} is active` : "Select a template to guide replies"}
                       </CardDescription>
@@ -428,22 +505,45 @@ export default function AssistantPage() {
 
               <ScrollArea className="flex-1 p-4" ref={scrollRef}>
                 <div className="space-y-4">
-                  {messages.length === 0 ? (
+                  {messages.length === 0 && !streamingMessage ? (
                     <p className="p-4 text-center text-sm text-muted-foreground">No messages yet. Ask for a task plan, summary, or recommendation.</p>
                   ) : (
-                    messages.map((message) => (
-                      <div key={message.id} className={`flex items-start gap-3 ${message.role === "user" ? "flex-row-reverse" : ""}`}>
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className={message.role === "assistant" ? "bg-primary text-primary-foreground" : "bg-muted"}>
-                            {message.role === "assistant" ? <Bot className="h-4 w-4" /> : <User className="h-4 w-4" />}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className={`max-w-[85%] rounded-lg p-3 ${message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-                          <p className="whitespace-pre-wrap text-sm">{message.content}</p>
-                          <p className="mt-1 text-xs opacity-70">{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
+                    <>
+                      {messages.map((message) => (
+                        <div key={message.id} className={`flex items-start gap-3 ${message.role === "user" ? "flex-row-reverse" : ""}`}>
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className={message.role === "assistant" ? "bg-primary text-primary-foreground" : "bg-muted"}>
+                              {message.role === "assistant" ? <Bot className="h-4 w-4" /> : <User className="h-4 w-4" />}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className={`max-w-[85%] rounded-lg p-3 ${message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                            <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+                            <p className="mt-1 text-xs opacity-70">{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
+                            {message.role === "assistant" && message.content.includes("```json") && (
+                              <div className="mt-3 border-t border-border pt-3">
+                                <Button size="sm" variant="outline" className="gap-2" onClick={() => convertToTasks(message.content)} disabled={isCreatingTasks}>
+                                  <Plus className="h-4 w-4" />
+                                  Convert to Tasks
+                                </Button>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      ))}
+                      {streamingMessage !== null && (
+                        <div className="flex items-start gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="bg-primary text-primary-foreground">
+                              <Bot className="h-4 w-4" />
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="max-w-[85%] rounded-lg bg-muted p-3">
+                            <p className="whitespace-pre-wrap text-sm">{streamingMessage}</p>
+                            <span className="mt-1 inline-block h-4 w-1 animate-pulse bg-primary" />
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </ScrollArea>
@@ -742,3 +842,4 @@ function UsageCard({ title, value }: { title: string; value: string | number }) 
     </Card>
   )
 }
+

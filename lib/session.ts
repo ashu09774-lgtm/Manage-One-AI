@@ -1,4 +1,4 @@
-﻿const SESSION_COOKIE = "taskflow_session"
+const SESSION_COOKIE = "manageone_session"
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7
 
 type SessionPayload = {
@@ -26,7 +26,10 @@ function base64UrlDecode(value: string) {
 }
 
 async function sign(value: string) {
-  const secret = process.env.AUTH_SECRET ?? "taskflow-dev-secret"
+  const secret = process.env.AUTH_SECRET
+  if (!secret) {
+    throw new Error("AUTH_SECRET environment variable is required")
+  }
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),
@@ -75,3 +78,4 @@ export async function verifySessionToken(token: string | undefined | null) {
 
 export const sessionCookieName = SESSION_COOKIE
 export const sessionMaxAge = SESSION_MAX_AGE
+

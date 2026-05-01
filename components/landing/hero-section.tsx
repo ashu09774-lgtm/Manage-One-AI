@@ -1,8 +1,9 @@
-﻿"use client"
+"use client"
 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, Sparkles, CheckCircle2, Bot, BarChart3, Zap, Users, FileText } from "lucide-react"
+import { motion } from "framer-motion"
 
 export function HeroSection() {
   return (
@@ -17,31 +18,51 @@ export function HeroSection() {
         <div className="mx-auto max-w-5xl text-center">
 
           {/* Animated Badge */}
-          <div className="animate-slide-up mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-5 py-2 text-sm backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-5 py-2 text-sm backdrop-blur-sm"
+          >
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
             </span>
             <span className="font-medium text-primary">AI-Powered Workspace</span>
             <span className="text-muted-foreground">— Built with Gemini AI</span>
-          </div>
+          </motion.div>
 
           {/* Headline */}
-          <h1 className="animate-slide-up stagger-1 mb-6 text-balance text-4xl font-bold tracking-tight md:text-6xl lg:text-7xl" style={{ opacity: 0 }}>
+          <motion.h1 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
+            className="mb-6 text-balance text-4xl font-bold tracking-tight md:text-6xl lg:text-7xl"
+          >
             Your team&apos;s work,{" "}
             <span className="animate-gradient-shift bg-gradient-to-r from-primary via-chart-2 to-chart-5 bg-clip-text text-transparent">
               powered by AI
             </span>
-          </h1>
+          </motion.h1>
 
           {/* Subheadline */}
-          <p className="animate-slide-up stagger-2 mx-auto mb-10 max-w-2xl text-pretty text-lg text-muted-foreground md:text-xl" style={{ opacity: 0 }}>
-            TaskFlow AI manages your tasks, automates repetitive workflows, and gives your team
+          <motion.p 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2, ease: "easeOut" }}
+            className="mx-auto mb-10 max-w-2xl text-pretty text-lg text-muted-foreground md:text-xl"
+          >
+            Manage One AI manages your tasks, automates repetitive workflows, and gives your team
             an AI assistant that actually understands your projects.
-          </p>
+          </motion.p>
 
           {/* CTA Buttons */}
-          <div className="animate-slide-up stagger-3 flex flex-col items-center justify-center gap-4 sm:flex-row" style={{ opacity: 0 }}>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3, ease: "easeOut" }}
+            className="flex flex-col items-center justify-center gap-4 sm:flex-row"
+          >
             <Link href="/signup">
               <Button size="lg" className="gap-2 px-8 text-base shadow-lg shadow-primary/25 transition-all hover:shadow-xl hover:shadow-primary/30">
                 Get Started Free
@@ -54,10 +75,15 @@ export function HeroSection() {
                 See How It Works
               </Button>
             </Link>
-          </div>
+          </motion.div>
 
           {/* Quick trust signals */}
-          <div className="animate-slide-up stagger-4 mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground" style={{ opacity: 0 }}>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.4, ease: "easeOut" }}
+            className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground"
+          >
             <span className="flex items-center gap-1.5">
               <CheckCircle2 className="h-4 w-4 text-chart-3" />
               No credit card required
@@ -70,10 +96,15 @@ export function HeroSection() {
               <CheckCircle2 className="h-4 w-4 text-chart-3" />
               Works with Google login
             </span>
-          </div>
+          </motion.div>
 
           {/* Dashboard Preview — Rich Mockup */}
-          <div className="animate-slide-up stagger-5 relative mx-auto mt-16 max-w-4xl" style={{ opacity: 0 }}>
+          <motion.div 
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.5, ease: "easeOut" }}
+            className="relative mx-auto mt-16 max-w-4xl"
+          >
             {/* Glow behind the card */}
             <div className="absolute -inset-4 rounded-2xl bg-gradient-to-r from-primary/20 via-chart-2/10 to-chart-5/20 opacity-60 blur-2xl" />
 
@@ -86,7 +117,7 @@ export function HeroSection() {
                   <div className="h-3 w-3 rounded-full bg-green-400/80" />
                 </div>
                 <div className="ml-4 flex-1 rounded-md bg-background/60 px-3 py-1 text-xs text-muted-foreground">
-                  taskflow-ai.app/dashboard
+                  Manage One-ai.app/dashboard
                 </div>
               </div>
 
@@ -98,7 +129,7 @@ export function HeroSection() {
                     <div className="flex h-6 w-6 items-center justify-center rounded bg-primary">
                       <Zap className="h-3.5 w-3.5 text-primary-foreground" />
                     </div>
-                    <span className="hidden text-xs font-bold lg:inline">TaskFlow</span>
+                    <span className="hidden text-xs font-bold lg:inline">Manage One</span>
                   </div>
                   <div className="space-y-1">
                     {[
@@ -208,7 +239,7 @@ export function HeroSection() {
                 Overdue reminder sent to 2 team members
               </p>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     </section>

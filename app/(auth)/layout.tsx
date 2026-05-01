@@ -1,4 +1,4 @@
-﻿import Link from "next/link"
+import Link from "next/link"
 import { Zap } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 
@@ -16,7 +16,7 @@ export default function AuthLayout({
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
               <Zap className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold">TaskFlow AI</span>
+            <span className="text-xl font-bold">Manage One AI</span>
           </Link>
           <ThemeToggle />
         </div>

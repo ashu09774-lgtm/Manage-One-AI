@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useEffect, useMemo, useState } from "react"
 import { AlertCircle, Bell, BellRing, CheckCheck, Clock, RefreshCcw, Settings, Trash2, Workflow } from "lucide-react"
@@ -74,7 +74,7 @@ export default function NotificationsPage() {
   const [error, setError] = useState("")
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("taskflow_user")
+    const storedUser = localStorage.getItem("manageone_user")
     if (storedUser) setUser(JSON.parse(storedUser))
   }, [])
 
@@ -405,3 +405,4 @@ function formatDateTime(value: string) {
     minute: "2-digit",
   })
 }
+

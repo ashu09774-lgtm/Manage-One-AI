@@ -1,17 +1,33 @@
 import { NextResponse } from "next/server"
 import type { ResultSetHeader, RowDataPacket } from "mysql2"
+import { z } from "zod"
 import { db } from "@/lib/db"
 import { hashPassword } from "@/lib/password"
+import { rateLimiter } from "@/lib/rate-limit"
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1, "Reset token is required").transform((v) => v.trim()),
+  password: z.string().min(6, "Password must be at least 6 characters").max(200),
+})
 
 export async function POST(request: Request) {
   try {
-    const { token, password } = await request.json()
-    const resetToken = String(token ?? "").trim()
-    const nextPassword = String(password ?? "")
-
-    if (!resetToken || nextPassword.length < 6) {
-      return NextResponse.json({ error: "Valid token and password are required" }, { status: 400 })
+    // Rate limit: 5 reset attempts per minute per IP
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown"
+    const rl = rateLimiter.limit(`reset-password:${ip}`, { limit: 5, windowMs: 60_000 })
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: "Too many attempts. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((rl.reset - Date.now()) / 1000)) } }
+      )
     }
+
+    const body = await request.json()
+    const parsed = resetPasswordSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.errors[0]?.message ?? "Invalid input" }, { status: 400 })
+    }
+    const { token: resetToken, password: nextPassword } = parsed.data
 
     const [[resetRecord]] = await db.execute<RowDataPacket[]>(
       `SELECT id, user_id AS userId

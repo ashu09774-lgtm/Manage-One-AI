@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState } from "react"
 import Link from "next/link"
@@ -58,7 +58,7 @@ export default function SignupPage() {
         return
       }
 
-      localStorage.setItem("taskflow_user", JSON.stringify(data.user))
+      localStorage.setItem("manageone_user", JSON.stringify(data.user))
       router.push("/dashboard")
     } catch {
       setError("Could not create account. Please make sure MySQL is running in XAMPP.")
@@ -189,3 +189,4 @@ export default function SignupPage() {
     </Card>
   )
 }
+

@@ -1,4 +1,5 @@
 "use client"
+// Branding: Manage One AI
 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -53,7 +54,7 @@ export function LandingHeader() {
               <div className="absolute -inset-1 -z-10 rounded-lg bg-primary/20 opacity-0 blur-md transition-opacity duration-300 group-hover:opacity-100" />
             </div>
             <span className="text-base font-bold tracking-tight">
-              Task<span className="bg-gradient-to-r from-primary to-chart-2 bg-clip-text text-transparent">Flow</span>
+              Manage <span className="bg-gradient-to-r from-primary to-chart-2 bg-clip-text text-transparent">One</span>
             </span>
           </Link>
 

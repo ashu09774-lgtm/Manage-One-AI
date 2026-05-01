@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Brain, CheckSquare, FileText, FolderKanban, Search, SlidersHorizontal, Sparkles, Zap } from "lucide-react"
+import { toast } from "sonner"
+import { Bookmark, Brain, CheckSquare, FileText, FolderKanban, Search, SlidersHorizontal, Sparkles, Trash2, Zap } from "lucide-react"
 
 interface UserData {
   id: string
@@ -32,6 +33,19 @@ interface SearchResult {
 interface WorkspaceOption {
   id: number
   name: string
+}
+
+interface SavedView {
+  id: number
+  name: string
+  filters: {
+    query: string
+    type: string
+    workspaceId: string
+    status: string
+    priority: string
+    smart: string
+  }
 }
 
 interface SearchPayload {
@@ -81,11 +95,13 @@ export default function SearchPage() {
   const [priority, setPriority] = useState("all")
   const [smart, setSmart] = useState("all")
   const [data, setData] = useState<SearchPayload>(emptyPayload)
+  const [savedViews, setSavedViews] = useState<SavedView[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [isSavingView, setIsSavingView] = useState(false)
   const [error, setError] = useState("")
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("taskflow_user")
+    const storedUser = localStorage.getItem("manageone_user")
     if (storedUser) setUser(JSON.parse(storedUser))
   }, [])
 
@@ -98,7 +114,77 @@ export default function SearchPage() {
     return () => window.clearTimeout(timeout)
   }, [user, query, type, workspaceId, status, priority, smart])
 
+  useEffect(() => {
+    if (!user?.id) return
+    void loadSavedViews()
+  }, [user])
+
   const topResults = useMemo(() => data.results.slice(0, 6), [data.results])
+
+  async function loadSavedViews() {
+    if (!user?.id) return
+    try {
+      const response = await fetch(`/api/views?userId=${user.id}`)
+      const payload = await response.json()
+      if (response.ok) setSavedViews(payload.views)
+    } catch (err) {
+      console.error("Failed to load saved views", err)
+    }
+  }
+
+  async function saveCurrentView() {
+    if (!user?.id) return
+    const name = window.prompt("Enter a name for this view:")
+    if (!name?.trim()) return
+
+    setIsSavingView(true)
+    try {
+      const response = await fetch("/api/views", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          name: name.trim(),
+          filters: { query, type, workspaceId, status, priority, smart },
+        }),
+      })
+
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error)
+
+      setSavedViews((current) => [payload.view, ...current])
+      toast.success("View saved successfully")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save view")
+    } finally {
+      setIsSavingView(false)
+    }
+  }
+
+  function applySavedView(view: SavedView) {
+    const { filters } = view
+    setQuery(filters.query || "")
+    setType(filters.type || "all")
+    setWorkspaceId(filters.workspaceId || "all")
+    setStatus(filters.status || "all")
+    setPriority(filters.priority || "all")
+    setSmart(filters.smart || "all")
+    toast.success(`Applied view: ${view.name}`)
+  }
+
+  async function deleteSavedView(id: number) {
+    if (!user?.id || !window.confirm("Are you sure you want to delete this view?")) return
+
+    try {
+      const response = await fetch(`/api/views/${id}?userId=${user.id}`, { method: "DELETE" })
+      if (!response.ok) throw new Error("Failed to delete view")
+
+      setSavedViews((current) => current.filter((v) => v.id !== id))
+      toast.success("View deleted")
+    } catch (err) {
+      toast.error("Could not delete view")
+    }
+  }
 
   async function runSearch() {
     if (!user?.id) return
@@ -146,7 +232,13 @@ export default function SearchPage() {
           <h1 className="text-2xl font-bold tracking-tight">Search & Smart Filters</h1>
           <p className="text-muted-foreground">Find tasks, projects, workspaces, notes, and docs with intent-aware filters.</p>
         </div>
-        <Button variant="outline" onClick={resetFilters}><SlidersHorizontal className="h-4 w-4" />Reset Filters</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={saveCurrentView} disabled={isSavingView}>
+            <Bookmark className="mr-2 h-4 w-4" />
+            Save View
+          </Button>
+          <Button variant="outline" onClick={resetFilters}><SlidersHorizontal className="mr-2 h-4 w-4" />Reset Filters</Button>
+        </div>
       </div>
 
       {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
@@ -255,6 +347,44 @@ export default function SearchPage() {
                   </button>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Bookmark className="h-5 w-5" />Saved Views</CardTitle>
+              <CardDescription>Your personal list of frequently used search and filter combinations.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {savedViews.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No saved views yet. Use "Save View" above to store your filters.</p>
+              ) : (
+                <div className="space-y-2">
+                  {savedViews.map((view) => (
+                    <div
+                      key={view.id}
+                      className="group flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/50"
+                    >
+                      <button
+                        type="button"
+                        className="flex flex-1 items-center gap-2 text-left"
+                        onClick={() => applySavedView(view)}
+                      >
+                        <Bookmark className="h-4 w-4 text-primary" />
+                        <span className="font-medium">{view.name}</span>
+                      </button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                        onClick={() => deleteSavedView(view.id)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -369,3 +499,4 @@ function ListSkeleton({ large = false }: { large?: boolean }) {
     </div>
   )
 }
+

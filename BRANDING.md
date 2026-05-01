@@ -1,13 +1,13 @@
-# TaskFlow AI Branding
+# Manage One AI Branding
 
 ## Product Name
 
-TaskFlow AI
+Manage One AI
 
 ## Logo Direction
 
 - Primary mark: rounded square with lightning glyph
-- Product wordmark: `TaskFlow AI`
+- Product wordmark: `Manage One AI`
 - Tone: fast, reliable, operational, intelligent
 
 ## Color Direction
@@ -18,7 +18,7 @@ TaskFlow AI
 
 ## Product Positioning
 
-TaskFlow AI is an AI-powered workspace for planning, execution, collaboration, and automation.
+Manage One AI is an AI-powered workspace for planning, execution, collaboration, and automation.
 
 ## Visual Principles
 
@@ -26,3 +26,4 @@ TaskFlow AI is an AI-powered workspace for planning, execution, collaboration, a
 - Clear hierarchy
 - SaaS-style dashboard polish
 - Minimal friction in forms and task flows
+

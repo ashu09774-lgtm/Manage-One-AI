@@ -151,7 +151,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   try {
     const { id } = await params
     const taskId = Number(id)
-    const { userId, status, completed, title, description, priority, dueDate, labelIds, subtasks, projectId, assigneeId } = await request.json()
+    const { userId, status, completed, title, description, priority, dueDate, labelIds, subtasks, projectId, assigneeId, sortOrder } = await request.json()
     const actorId = Number(userId)
 
     if (!Number.isInteger(taskId) || taskId < 1 || !Number.isInteger(actorId) || actorId < 1) {
@@ -169,6 +169,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       t.description,
       t.status,
       t.priority,
+      t.sort_order AS sortOrder,
       DATE_FORMAT(t.due_date, '%Y-%m-%d') AS dueDate
       FROM tasks t
       INNER JOIN workspace_members wm ON wm.workspace_id = t.workspace_id AND wm.user_id = ?
@@ -194,6 +195,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const nextProjectId = projectId === undefined ? task.projectId : (Number.isInteger(Number(projectId)) && Number(projectId) > 0 ? Number(projectId) : null)
     const nextAssigneeId = assigneeId === undefined ? task.assigneeId : (Number.isInteger(Number(assigneeId)) && Number(assigneeId) > 0 ? Number(assigneeId) : null)
 
+    const nextSortOrder = sortOrder === undefined ? (task.sortOrder ?? 0) : Number(sortOrder)
+
     if (nextProjectId) {
       const [projectRows] = await db.execute<RowDataPacket[]>(
         "SELECT id FROM projects WHERE id = ? AND workspace_id = ? AND archived_at IS NULL LIMIT 1",
@@ -218,9 +221,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     await db.execute(
       `UPDATE tasks
-      SET project_id = ?, assignee_id = ?, title = ?, description = ?, status = ?, priority = ?, due_date = ?, completed_at = CASE WHEN ? = 'done' THEN CURRENT_TIMESTAMP ELSE NULL END
+      SET project_id = ?, assignee_id = ?, title = ?, description = ?, status = ?, priority = ?, due_date = ?, sort_order = ?, completed_at = CASE WHEN ? = 'done' THEN CURRENT_TIMESTAMP ELSE NULL END
       WHERE id = ?`,
-      [nextProjectId, nextAssigneeId, nextTitle, nextDescription, nextStatus, nextPriority, nextDueDate, nextStatus, taskId]
+      [nextProjectId, nextAssigneeId, nextTitle, nextDescription, nextStatus, nextPriority, nextDueDate, nextSortOrder, nextStatus, taskId]
     )
 
     if (Array.isArray(labelIds)) {

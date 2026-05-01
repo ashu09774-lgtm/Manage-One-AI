@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -16,12 +16,9 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Menu, Search, Bell, LogOut, User, Settings } from "lucide-react"
 import { useEffect, useState } from "react"
+import { useUser } from "@/components/user-provider"
 
-interface UserData {
-  id: string
-  name: string
-  email: string
-}
+
 
 interface NotificationItem {
   id: number
@@ -34,17 +31,10 @@ interface NotificationItem {
 
 export function DashboardHeader({ onMenuClick }: { onMenuClick?: () => void }) {
   const router = useRouter()
-  const [user, setUser] = useState<UserData | null>(null)
+  const { user } = useUser()
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState("")
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem("taskflow_user")
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
-    }
-  }, [])
 
   useEffect(() => {
     if (!user?.id) return
@@ -93,7 +83,7 @@ export function DashboardHeader({ onMenuClick }: { onMenuClick?: () => void }) {
 
   const handleLogout = () => {
     fetch("/api/auth/logout", { method: "POST" }).finally(() => {
-      localStorage.removeItem("taskflow_user")
+      try { localStorage.removeItem("manageone_user") } catch { /* ignore */ }
       router.push("/")
     })
   }
@@ -128,18 +118,19 @@ export function DashboardHeader({ onMenuClick }: { onMenuClick?: () => void }) {
       <Button variant="ghost" size="icon" className="shrink-0 md:hidden" onClick={onMenuClick} aria-label="Open navigation">
         <Menu className="h-5 w-5" />
       </Button>
+
+
       {/* Search */}
-      <form className="relative min-w-0 flex-1 sm:max-w-md" onSubmit={handleSearch}>
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <form className="relative min-w-0 flex-1 sm:max-w-md group" onSubmit={handleSearch}>
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
         <Input
           type="search"
           placeholder="Search tasks, projects, notes..."
-          className="w-full pl-10"
+          className="w-full pl-10 rounded-xl border-border/40 bg-background/50 backdrop-blur-md focus-visible:ring-primary/30 transition-all duration-300"
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
         />
       </form>
-
       {/* Actions */}
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         <DropdownMenu>
@@ -229,3 +220,4 @@ export function DashboardHeader({ onMenuClick }: { onMenuClick?: () => void }) {
     </header>
   )
 }
+

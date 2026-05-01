@@ -518,3 +518,111 @@ CREATE TABLE IF NOT EXISTS automation_runs (
     FOREIGN KEY (automation_id) REFERENCES automations(id)
     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Phase 2.1 Task Management Schema Additions
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS sort_order INT NOT NULL DEFAULT 0 AFTER completed_at;
+
+CREATE TABLE IF NOT EXISTS task_dependencies (
+  task_id INT NOT NULL,
+  depends_on_task_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (task_id, depends_on_task_id),
+  CONSTRAINT fk_task_dependencies_task
+    FOREIGN KEY (task_id) REFERENCES tasks(id)
+    ON DELETE CASCADE,
+  CONSTRAINT fk_task_dependencies_depends
+    FOREIGN KEY (depends_on_task_id) REFERENCES tasks(id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS task_time_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  task_id INT NOT NULL,
+  user_id INT NOT NULL,
+  start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  end_time TIMESTAMP NULL,
+  duration_seconds INT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_task_time_logs_task_id (task_id),
+  INDEX idx_task_time_logs_user_id (user_id),
+  CONSTRAINT fk_task_time_logs_task
+    FOREIGN KEY (task_id) REFERENCES tasks(id)
+    ON DELETE CASCADE,
+  CONSTRAINT fk_task_time_logs_user
+    FOREIGN KEY (user_id) REFERENCES users(id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Saved custom filter views (Phase 2.3)
+CREATE TABLE IF NOT EXISTS saved_views (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  filters JSON NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_saved_views_user_id (user_id),
+  CONSTRAINT fk_saved_views_user
+    FOREIGN KEY (user_id) REFERENCES users(id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Task templates (Phase 2.1)
+CREATE TABLE IF NOT EXISTS task_templates (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  template_data JSON NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_task_templates_user_id (user_id),
+  CONSTRAINT fk_task_templates_user
+    FOREIGN KEY (user_id) REFERENCES users(id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Workspace chats (Phase 2.2)
+CREATE TABLE IF NOT EXISTS workspace_chats (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  workspace_id INT NOT NULL,
+  user_id INT NOT NULL,
+  message TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_workspace_chats_workspace_id (workspace_id),
+  CONSTRAINT fk_workspace_chats_workspace
+    FOREIGN KEY (workspace_id) REFERENCES workspaces(id)
+    ON DELETE CASCADE,
+  CONSTRAINT fk_workspace_chats_user
+    FOREIGN KEY (user_id) REFERENCES users(id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Automation execution tracking
+CREATE TABLE IF NOT EXISTS automation_runs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  automation_id INT NOT NULL,
+  trigger_type VARCHAR(50) NOT NULL,
+  status ENUM('success', 'failed', 'partial') NOT NULL,
+  started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  finished_at TIMESTAMP NULL,
+  error_message TEXT,
+  INDEX idx_automation_runs_automation (automation_id),
+  CONSTRAINT fk_automation_runs_automation
+    FOREIGN KEY (automation_id) REFERENCES automations(id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS automation_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  run_id INT NOT NULL,
+  node_id VARCHAR(100) NOT NULL,
+  node_type VARCHAR(50) NOT NULL,
+  status ENUM('success', 'failed', 'skipped') NOT NULL,
+  input_data JSON,
+  output_data JSON,
+  error_details TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_automation_logs_run (run_id),
+  CONSTRAINT fk_automation_logs_run
+    FOREIGN KEY (run_id) REFERENCES automation_runs(id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

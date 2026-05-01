@@ -1,4 +1,4 @@
-﻿import type { ResultSetHeader, RowDataPacket } from "mysql2"
+import type { ResultSetHeader, RowDataPacket } from "mysql2"
 import { db } from "@/lib/db"
 
 export type PromptTemplate = {
@@ -31,16 +31,17 @@ const builtInTemplates: PromptTemplate[] = [
     name: "Workspace Assistant",
     category: "assistant",
     source: "default",
-    systemPrompt: "You are TaskFlow AI, a practical assistant for a productivity workspace. Be concise, specific, and action-oriented.",
+    systemPrompt: "You are Manage One AI, a practical assistant for a productivity workspace. Be concise, specific, and action-oriented.",
     promptPrefix: "Use the workspace context when it helps. Prefer recommendations that can be acted on today.",
   },
+
   {
     id: "task-generation",
     name: "AI Task Generation",
     category: "task_generation",
     source: "default",
-    systemPrompt: "Turn goals into concrete tasks. Produce a compact checklist with priorities, suggested owners, and due-date guidance.",
-    promptPrefix: "If the request is broad, break it into phases and list 5-10 realistic tasks.",
+    systemPrompt: "Turn goals into concrete tasks. If you identify specific tasks, provide them in a JSON block at the end of your response like this: ```json [{\"title\": \"...\", \"priority\": \"...\", \"description\": \"...\"}] ```.",
+    promptPrefix: "If the request is broad, break it into phases and list 5-10 realistic tasks. Always include the JSON block for the identified tasks.",
   },
   {
     id: "smart-suggestions",
@@ -344,6 +345,42 @@ export async function generateAssistantReply(input: {
   }
 }
 
+export async function generateAssistantStream(input: {
+  userId: number
+  conversationId: number
+  template: PromptTemplate
+  content: string
+  workspaceId?: number | null
+  summary?: string | null
+}) {
+  const context = await getWorkspaceContext(input.userId, input.workspaceId)
+  const prompt = buildPrompt(input.template, input.content, context, input.summary)
+  const apiKey = process.env.GEMINI_API_KEY
+  const model = process.env.GEMINI_MODEL ?? "gemini-2.0-flash"
+
+  if (!apiKey) {
+    throw new Error("Gemini API key not configured for streaming")
+  }
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+      }),
+    }
+  )
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error?.message ?? "Streaming request failed")
+  }
+
+  return response.body // Returns a ReadableStream
+}
+
 export async function generateContextualAiResponse(input: {
   userId: number
   workspaceId?: number | null
@@ -389,15 +426,47 @@ export async function generateContextualAiResponse(input: {
   }
 }
 
-function buildPrompt(template: PromptTemplate, content: string, context: WorkspaceContext) {
+function buildPrompt(template: PromptTemplate, content: string, context: WorkspaceContext, summary?: string | null) {
   return [
     template.systemPrompt,
     template.promptPrefix,
+    summary ? `Previous Conversation Summary:\n${summary}\n` : null,
     "Workspace snapshot:",
     JSON.stringify(context, null, 2),
     "User request:",
     content,
   ].filter(Boolean).join("\n\n")
+}
+
+export async function summarizeConversation(messages: Array<{ role: string; content: string }>) {
+  if (messages.length < 6) return null
+
+  const prompt = `Summarize the following conversation between a user and an AI assistant in 200 words or less. Focus on the core goals, decisions, and tasks identified.
+  
+  CONVERSATION:
+  ${messages.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join("\n")}
+  
+  SUMMARY:`
+
+  const apiKey = process.env.GEMINI_API_KEY
+  const model = process.env.GEMINI_MODEL ?? "gemini-2.0-flash"
+
+  if (!apiKey) return "Long conversation history (local summary unavailable)"
+
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+      }),
+    })
+    const data = await response.json()
+    return extractGeminiText(data)
+  } catch (error) {
+    console.error("Summarization failed:", error)
+    return "Summary failed."
+  }
 }
 
 async function callProvider(prompt: string, template: PromptTemplate, context: WorkspaceContext): Promise<ProviderResult> {
@@ -444,7 +513,7 @@ async function callProvider(prompt: string, template: PromptTemplate, context: W
       const fallback = generateFallbackReply(template, context, prompt)
       return {
         content: fallback,
-        provider: "taskflow-local",
+        provider: "manage-one-local",
         model: "heuristic",
         status: "fallback",
         errorMessage: error instanceof Error ? error.message : "Unknown provider error",
@@ -454,7 +523,7 @@ async function callProvider(prompt: string, template: PromptTemplate, context: W
 
   return {
     content: generateFallbackReply(template, context, prompt),
-    provider: "taskflow-local",
+    provider: "manage-one-local",
     model: "heuristic",
     status: "fallback",
   }
@@ -601,7 +670,7 @@ function fallbackGeneral(context: WorkspaceContext) {
     : "- No workspace data available yet"
 
   return [
-    "TaskFlow AI is running in local fallback mode.",
+    "Manage One AI is running in local fallback mode.",
     "",
     "I can still help with task planning, summaries, and workspace recommendations using your saved project data.",
     "",
@@ -622,3 +691,4 @@ function extractBodyPreview(prompt: string) {
   const requestLine = lines[lines.length - 1] ?? ""
   return requestLine.length > 220 ? `${requestLine.slice(0, 217)}...` : requestLine
 }
+

@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
@@ -38,7 +38,7 @@ export default function WorkspacesPage() {
   const [error, setError] = useState("")
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("taskflow_user")
+    const storedUser = localStorage.getItem("manageone_user")
     if (storedUser) {
       setUser(JSON.parse(storedUser))
     }
@@ -196,3 +196,4 @@ export default function WorkspacesPage() {
     </div>
   )
 }
+

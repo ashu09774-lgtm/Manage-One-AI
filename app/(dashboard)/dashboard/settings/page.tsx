@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useEffect, useMemo, useState } from "react"
 import { useTheme } from "next-themes"
@@ -64,7 +64,7 @@ export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("taskflow_user")
+    const storedUser = localStorage.getItem("manageone_user")
     if (storedUser) {
       const parsed = JSON.parse(storedUser)
       setUser(parsed)
@@ -158,7 +158,7 @@ export default function SettingsPage() {
 
     if (response.ok) {
       const updatedUser = { ...user, ...data.user, name, email }
-      localStorage.setItem("taskflow_user", JSON.stringify(updatedUser))
+      localStorage.setItem("manageone_user", JSON.stringify(updatedUser))
       setUser(updatedUser)
       setMessage("Account settings saved.")
     } else {
@@ -470,3 +470,4 @@ function PreferenceRow({ title, description, checked, onChange }: { title: strin
     </div>
   )
 }
+

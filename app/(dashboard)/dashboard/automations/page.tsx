@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useEffect, useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge"
@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Bot, CalendarClock, CheckSquare, Clock3, Play, RefreshCcw, Save, Sparkles, Trash2, Workflow } from "lucide-react"
+import { WorkflowBuilder } from "@/components/automations/workflow-builder"
 
 interface UserData {
   id: string
@@ -70,6 +71,7 @@ const emptyForm = {
   followUpDescription: "",
   priority: "medium",
   status: "todo",
+  graph: null as { nodes: any[]; edges: any[] } | null,
 }
 
 export default function AutomationsPage() {
@@ -85,7 +87,7 @@ export default function AutomationsPage() {
   const [error, setError] = useState("")
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("taskflow_user")
+    const storedUser = localStorage.getItem("manageone_user")
     if (storedUser) setUser(JSON.parse(storedUser))
   }, [])
 
@@ -143,7 +145,7 @@ export default function AutomationsPage() {
       triggerType: form.triggerType,
       actionType: form.actionType,
       enabled: form.enabled,
-      config: buildConfigFromForm(form),
+      config: form.graph ? { ...buildConfigFromForm(form), graph: form.graph } : buildConfigFromForm(form),
     }
 
     const response = await fetch(form.id ? `/api/automations/${form.id}` : "/api/automations", {
@@ -214,6 +216,7 @@ export default function AutomationsPage() {
       followUpDescription: String(automation.config.followUpDescription ?? ""),
       priority: String(automation.config.priority ?? "medium"),
       status: String(automation.config.status ?? "todo"),
+      graph: automation.config.graph as { nodes: any[]; edges: any[] } | null ?? null,
     })
   }
 
@@ -296,91 +299,28 @@ export default function AutomationsPage() {
                 <Textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} className="min-h-24" />
               </Field>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Trigger">
-                  <Select value={form.triggerType} onValueChange={(value) => setForm((current) => ({ ...current, triggerType: value as Automation["triggerType"] }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="task_overdue">Task Overdue</SelectItem>
-                      <SelectItem value="task_due_soon">Task Due Soon</SelectItem>
-                      <SelectItem value="recurring_task">Recurring Task</SelectItem>
-                      <SelectItem value="task_completed">Task Completed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="Action">
-                  <Select value={form.actionType} onValueChange={(value) => setForm((current) => ({ ...current, actionType: value as Automation["actionType"] }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="notify_assignee">Notify Assignee</SelectItem>
-                      <SelectItem value="notify_owner">Notify Owner</SelectItem>
-                      <SelectItem value="create_task">Create Task</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
+              <div className="flex items-center justify-between mt-8 mb-4">
+                <div>
+                  <h3 className="text-lg font-medium">Visual Workflow</h3>
+                  <p className="text-sm text-muted-foreground">Drag and drop nodes to build your logic.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label>Enabled</Label>
+                  <Switch checked={form.enabled} onCheckedChange={(checked) => setForm((current) => ({ ...current, enabled: checked }))} />
+                </div>
               </div>
 
-              <div className="rounded-lg border border-border p-4">
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <div className="font-medium">Rule Configuration</div>
-                    <div className="text-sm text-muted-foreground">Fields adapt to the selected trigger and action.</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label>Enabled</Label>
-                    <Switch checked={form.enabled} onCheckedChange={(checked) => setForm((current) => ({ ...current, enabled: checked }))} />
-                  </div>
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  {form.triggerType === "task_due_soon" && (
-                    <Field label="Days Ahead">
-                      <Input type="number" min="1" value={form.daysAhead} onChange={(event) => setForm((current) => ({ ...current, daysAhead: event.target.value }))} />
-                    </Field>
-                  )}
-                  {form.triggerType === "recurring_task" && (
-                    <>
-                      <Field label="Source Task ID">
-                        <Input value={form.sourceTaskId} onChange={(event) => setForm((current) => ({ ...current, sourceTaskId: event.target.value }))} />
-                      </Field>
-                      <Field label="Cadence Days">
-                        <Input type="number" min="1" value={form.cadenceDays} onChange={(event) => setForm((current) => ({ ...current, cadenceDays: event.target.value }))} />
-                      </Field>
-                    </>
-                  )}
-                  {form.triggerType === "task_completed" && (
-                    <>
-                      <Field label="Follow-up Title">
-                        <Input value={form.followUpTitle} onChange={(event) => setForm((current) => ({ ...current, followUpTitle: event.target.value }))} />
-                      </Field>
-                      <Field label="Follow-up Status">
-                        <Select value={form.status} onValueChange={(value) => setForm((current) => ({ ...current, status: value }))}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="todo">To Do</SelectItem>
-                            <SelectItem value="in-progress">In Progress</SelectItem>
-                            <SelectItem value="review">Review</SelectItem>
-                            <SelectItem value="done">Done</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </Field>
-                      <Field label="Follow-up Priority">
-                        <Select value={form.priority} onValueChange={(value) => setForm((current) => ({ ...current, priority: value }))}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="low">Low</SelectItem>
-                            <SelectItem value="medium">Medium</SelectItem>
-                            <SelectItem value="high">High</SelectItem>
-                            <SelectItem value="urgent">Urgent</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </Field>
-                      <Field label="Follow-up Description">
-                        <Textarea value={form.followUpDescription} onChange={(event) => setForm((current) => ({ ...current, followUpDescription: event.target.value }))} className="min-h-24" />
-                      </Field>
-                    </>
-                  )}
-                </div>
-              </div>
+              <WorkflowBuilder 
+                initialGraph={form.graph || undefined} 
+                onSave={(graph) => {
+                  setForm((current) => ({
+                    ...current,
+                    graph,
+                    triggerType: "task_overdue", // Placeholder generic trigger for now
+                    actionType: "notify_assignee" // Placeholder generic action for now
+                  }))
+                }}
+              />
 
               <div className="flex flex-wrap justify-end gap-2">
                 {form.id && (
@@ -549,3 +489,4 @@ function buildConfigFromForm(form: typeof emptyForm) {
 
   return config
 }
+

@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useEffect, useMemo, useState } from "react"
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
@@ -59,7 +59,7 @@ export default function AnalyticsPage() {
   const [error, setError] = useState("")
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("taskflow_user")
+    const storedUser = localStorage.getItem("manageone_user")
     if (storedUser) setUser(JSON.parse(storedUser))
   }, [])
 
@@ -125,7 +125,7 @@ export default function AnalyticsPage() {
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement("a")
     anchor.href = url
-    anchor.download = `taskflow-analytics-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = `Manage One-analytics-${new Date().toISOString().slice(0, 10)}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -369,3 +369,4 @@ function InsightSkeleton() {
 function escapeCsv(value: string) {
   return `"${value.replaceAll("\"", "\"\"")}"`
 }
+

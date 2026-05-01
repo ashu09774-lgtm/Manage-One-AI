@@ -1,42 +1,30 @@
-﻿"use client"
+"use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardSidebar } from "@/components/dashboard/sidebar"
 import { DashboardHeader } from "@/components/dashboard/header"
+import { MobileNav } from "@/components/dashboard/mobile-nav"
+import { UserProvider, useUser } from "@/components/user-provider"
+import { CommandPalette } from "@/components/ui/command-palette"
 import { cn } from "@/lib/utils"
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+function DashboardShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
-  const [authorized, setAuthorized] = useState(false)
   const router = useRouter()
+  const { user, isLoading } = useUser()
 
-  useEffect(() => {
-    async function checkSession() {
-      setMounted(true)
-      const response = await fetch("/api/auth/me", { cache: "no-store" })
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    )
+  }
 
-      if (!response.ok) {
-        localStorage.removeItem("taskflow_user")
-        router.push("/login")
-        return
-      }
-
-      const data = await response.json()
-      localStorage.setItem("taskflow_user", JSON.stringify(data.user))
-      setAuthorized(true)
-    }
-
-    checkSession()
-  }, [router])
-
-  if (!mounted || !authorized) {
+  if (!user) {
+    router.push("/login")
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -45,7 +33,11 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="relative min-h-screen overflow-hidden bg-background">
+      {/* Premium background orbs */}
+      <div className="gradient-orb gradient-orb-1 top-[-10%] left-[-10%] animate-pulse-glow" />
+      <div className="gradient-orb gradient-orb-2 bottom-[-10%] right-[-10%] animate-float-slow" />
+      
       <a href="#dashboard-content" className="skip-link">Skip to content</a>
       <DashboardSidebar
         collapsed={collapsed}
@@ -55,13 +47,27 @@ export default function DashboardLayout({
       />
       <div
         className={cn(
-          "flex min-w-0 flex-col transition-all duration-300",
+          "relative z-10 flex min-w-0 flex-col transition-all duration-300",
           collapsed ? "md:ml-16" : "md:ml-64"
         )}
       >
         <DashboardHeader onMenuClick={() => setMobileSidebarOpen(true)} />
-        <main id="dashboard-content" className="flex-1 p-4 sm:p-6">{children}</main>
+        <main id="dashboard-content" className="flex-1 p-4 pb-20 sm:p-6 sm:pb-6">{children}</main>
       </div>
+      <MobileNav />
     </div>
+  )
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <UserProvider>
+      <DashboardShell>{children}</DashboardShell>
+      <CommandPalette />
+    </UserProvider>
   )
 }

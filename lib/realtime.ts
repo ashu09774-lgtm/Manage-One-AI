@@ -1,4 +1,4 @@
-﻿type EventPayload = Record<string, unknown>
+type EventPayload = Record<string, unknown>
 
 type Subscriber = {
   id: string
@@ -8,13 +8,13 @@ type Subscriber = {
 }
 
 declare global {
-  var taskflowRealtimeSubscribers: Map<string, Subscriber> | undefined
+  var manageOneRealtimeSubscribers: Map<string, Subscriber> | undefined
 }
 
-const subscribers = globalThis.taskflowRealtimeSubscribers ?? new Map<string, Subscriber>()
+const subscribers = globalThis.manageOneRealtimeSubscribers ?? new Map<string, Subscriber>()
 
-if (!globalThis.taskflowRealtimeSubscribers) {
-  globalThis.taskflowRealtimeSubscribers = subscribers
+if (!globalThis.manageOneRealtimeSubscribers) {
+  globalThis.manageOneRealtimeSubscribers = subscribers
 }
 
 function formatSseEvent(event: string, data: EventPayload) {
@@ -34,8 +34,26 @@ export function createRealtimeStream(input: { userId: number; workspaceId?: numb
       })
 
       controller.enqueue(formatSseEvent("ready", { subscriberId }))
+
+      // Send a heartbeat every 25 seconds to keep the connection alive
+      // and detect dead connections early
+      const heartbeatInterval = setInterval(() => {
+        try {
+          controller.enqueue(`: heartbeat ${Date.now()}\n\n`)
+        } catch {
+          clearInterval(heartbeatInterval)
+          subscribers.delete(subscriberId)
+        }
+      }, 25000)
+
+      // Store the interval ID so we can clean it up on cancel
+      ;(controller as unknown as Record<string, unknown>).__heartbeatInterval = heartbeatInterval
     },
-    cancel() {
+    cancel(controller) {
+      const ctrl = controller as unknown as Record<string, unknown>
+      if (ctrl?.__heartbeatInterval) {
+        clearInterval(ctrl.__heartbeatInterval as ReturnType<typeof setInterval>)
+      }
       subscribers.delete(subscriberId)
     },
   })
@@ -47,10 +65,19 @@ export function removeRealtimeSubscriber(subscriberId: string) {
   subscribers.delete(subscriberId)
 }
 
+function safeSend(subscriber: Subscriber, message: string) {
+  try {
+    subscriber.controller.enqueue(message)
+  } catch {
+    // Subscriber is disconnected — remove it
+    subscribers.delete(subscriber.id)
+  }
+}
+
 export function emitWorkspaceEvent(workspaceId: number, event: string, data: EventPayload) {
   for (const subscriber of subscribers.values()) {
     if (subscriber.workspaceId === workspaceId) {
-      subscriber.controller.enqueue(formatSseEvent(event, data))
+      safeSend(subscriber, formatSseEvent(event, data))
     }
   }
 }
@@ -58,7 +85,20 @@ export function emitWorkspaceEvent(workspaceId: number, event: string, data: Eve
 export function emitUserEvent(userId: number, event: string, data: EventPayload) {
   for (const subscriber of subscribers.values()) {
     if (subscriber.userId === userId) {
-      subscriber.controller.enqueue(formatSseEvent(event, data))
+      safeSend(subscriber, formatSseEvent(event, data))
     }
   }
 }
+
+export function getSubscriberCount() {
+  return subscribers.size
+}
+
+export function getWorkspaceSubscriberCount(workspaceId: number) {
+  let count = 0
+  for (const subscriber of subscribers.values()) {
+    if (subscriber.workspaceId === workspaceId) count++
+  }
+  return count
+}
+

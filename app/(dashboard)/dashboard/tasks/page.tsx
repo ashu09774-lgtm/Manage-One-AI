@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
@@ -12,10 +12,17 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
+import { Skeleton } from "@/components/ui/skeleton"
+import { EmptyState } from "@/components/ui/empty-state"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Calendar, CheckSquare, Filter, List, MessageSquare, MoreHorizontal, Paperclip, Plus, Search, Tag, Trash2 } from "lucide-react"
+import { RichTextEditor } from "@/components/ui/rich-text-editor"
+import { KanbanBoard } from "@/components/tasks/kanban-board"
+import { TimeTracker } from "@/components/tasks/time-tracker"
+import { toast } from "sonner"
+import { AnimatePresence, motion } from "framer-motion"
+import { Calendar, CheckSquare, Filter, Image as ImageIcon, List, MessageSquare, MoreHorizontal, Paperclip, Plus, Search, Tag, Trash2, X } from "lucide-react"
 
 interface UserData {
   id: string
@@ -72,6 +79,14 @@ interface TaskDetail extends Task {
   subtasks: Subtask[]
   comments: TaskComment[]
   attachments: TaskAttachment[]
+  dependencies: TaskDependency[]
+}
+
+interface TaskDependency {
+  id: number
+  title: string
+  status: string
+  priority: string
 }
 
 interface TaskComment {
@@ -91,6 +106,20 @@ interface TaskAttachment {
   uploadedBy: number | null
   uploadedByName: string | null
   createdAt: string
+}
+
+interface TaskTemplate {
+  id: number
+  name: string
+  templateData: {
+    title: string
+    description: string
+    priority: string
+    status: string
+    workspaceId?: string
+    projectId?: string
+    labelIds?: number[]
+  }
 }
 
 const columns = [
@@ -134,6 +163,9 @@ export default function TasksPage() {
   const [newCommentBody, setNewCommentBody] = useState("")
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
+  const [newDependencyId, setNewDependencyId] = useState("")
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<number>>(new Set())
+  const [isBulkActing, setIsBulkActing] = useState(false)
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",
@@ -147,15 +179,19 @@ export default function TasksPage() {
   })
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(true)
+  const [templates, setTemplates] = useState<TaskTemplate[]>([])
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false)
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false)
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("taskflow_user")
+    const storedUser = localStorage.getItem("manageone_user")
     if (storedUser) setUser(JSON.parse(storedUser))
   }, [])
 
   useEffect(() => {
     if (!user?.id) return
     void loadData(user.id)
+    void loadTemplates(user.id)
   }, [user])
 
   useEffect(() => {
@@ -232,6 +268,80 @@ export default function TasksPage() {
     setProjectsByWorkspace((current) => ({ ...current, [workspaceId]: data.projects }))
   }
 
+  async function loadTemplates(userId: string) {
+    try {
+      const response = await fetch(`/api/tasks/templates?userId=${userId}`)
+      const data = await response.json()
+      if (response.ok) setTemplates(data.templates)
+    } catch (err) {
+      console.error("Failed to load templates", err)
+    }
+  }
+
+  async function saveAsTemplate() {
+    if (!user?.id || !selectedTask) return
+    const name = window.prompt("Enter a name for this template:")
+    if (!name?.trim()) return
+
+    setIsSavingTemplate(true)
+    try {
+      const response = await fetch("/api/tasks/templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          name: name.trim(),
+          templateData: {
+            title: selectedTask.title,
+            description: selectedTask.description,
+            priority: selectedTask.priority,
+            status: selectedTask.status,
+            workspaceId: String(selectedTask.workspaceId),
+            projectId: selectedTask.projectId ? String(selectedTask.projectId) : "none",
+            labelIds: selectedTask.labels.map(l => l.id),
+          },
+        }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error)
+
+      setTemplates((current) => [...current, data.template])
+      toast.success("Template saved successfully")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save template")
+    } finally {
+      setIsSavingTemplate(false)
+    }
+  }
+
+  function applyTemplate(template: TaskTemplate) {
+    const { templateData } = template
+    setNewTask((current) => ({
+      ...current,
+      title: templateData.title || "",
+      description: templateData.description || "",
+      priority: (templateData.priority as any) || "medium",
+      status: (templateData.status as any) || "todo",
+      workspaceId: templateData.workspaceId || current.workspaceId,
+      projectId: templateData.projectId || "none",
+      labelIds: templateData.labelIds || [],
+    }))
+    toast.success(`Applied template: ${template.name}`)
+  }
+
+  async function deleteTemplate(id: number) {
+    if (!user?.id || !window.confirm("Delete this template?")) return
+    try {
+      const response = await fetch(`/api/tasks/templates/${id}?userId=${user.id}`, { method: "DELETE" })
+      if (!response.ok) throw new Error("Failed to delete template")
+      setTemplates((current) => current.filter((t) => t.id !== id))
+      toast.success("Template deleted")
+    } catch (err) {
+      toast.error("Could not delete template")
+    }
+  }
+
   async function toggleTaskComplete(task: Task) {
     if (!user?.id) return
     const completed = task.status !== "done"
@@ -241,6 +351,32 @@ export default function TasksPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: user.id, completed }),
     })
+    
+    if (completed) {
+      toast.success("Task completed!")
+    } else {
+      toast.success("Task marked as to-do")
+    }
+  }
+
+  async function handleTaskMove(taskId: string | number, newStatus: string, newIndex: number) {
+    if (!user?.id) return
+    const id = Number(taskId)
+    
+    // Optimistic update
+    setTasks((current) => current.map((item) => item.id === id ? { ...item, status: newStatus as Task["status"] } : item))
+    
+    try {
+      const response = await fetch(`/api/tasks/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, status: newStatus }),
+      })
+      if (!response.ok) throw new Error("Update failed")
+    } catch {
+      toast.error("Failed to update task status")
+      void loadData(user.id) // Revert on failure
+    }
   }
 
   async function handleCreateTask() {
@@ -260,9 +396,12 @@ export default function TasksPage() {
     const data = await response.json()
 
     if (!response.ok) {
+      toast.error(data.error ?? "Could not create task")
       setError(data.error ?? "Could not create task")
       return
     }
+
+    toast.success("Task created successfully")
 
     const workspace = workspaces.find((item) => item.id === Number(newTask.workspaceId))
     const labels = (labelsByWorkspace[Number(newTask.workspaceId)] ?? []).filter((label) => newTask.labelIds.includes(label.id))
@@ -283,15 +422,22 @@ export default function TasksPage() {
       setError(data.error ?? "Could not load task")
       return
     }
-    await loadLabels(Number(data.task.workspaceId), user.id)
-    await loadMembers(Number(data.task.workspaceId), user.id)
-    await loadProjects(Number(data.task.workspaceId), user.id)
+    const [depsResponse] = await Promise.all([
+      fetch(`/api/tasks/${taskId}/dependencies?userId=${user.id}`),
+      loadLabels(Number(data.task.workspaceId), user.id),
+      loadMembers(Number(data.task.workspaceId), user.id),
+      loadProjects(Number(data.task.workspaceId), user.id)
+    ])
+    
+    const depsData = depsResponse.ok ? await depsResponse.json() : { dependencies: [] }
+
     setSelectedTask({
       ...data.task,
       labels: data.task.labels ?? [],
       subtasks: data.task.subtasks ?? [],
       comments: data.task.comments ?? [],
       attachments: data.task.attachments ?? [],
+      dependencies: depsData.dependencies ?? [],
       subtasksTotal: data.task.subtasks?.length ?? 0,
       subtasksCompleted: (data.task.subtasks ?? []).filter((item: Subtask) => item.completed).length,
     })
@@ -321,9 +467,12 @@ export default function TasksPage() {
     const data = await response.json()
 
     if (!response.ok) {
+      toast.error(data.error ?? "Could not update task")
       setError(data.error ?? "Could not update task")
       return
     }
+
+    toast.success("Task updated successfully")
 
     const subtasksTotal = selectedTask.subtasks.length
     const subtasksCompleted = selectedTask.subtasks.filter((item) => item.completed).length
@@ -343,9 +492,11 @@ export default function TasksPage() {
     const response = await fetch(`/api/tasks/${taskId}?userId=${user.id}`, { method: "DELETE" })
     if (!response.ok) {
       const data = await response.json()
+      toast.error(data.error ?? "Could not delete task")
       setError(data.error ?? "Could not delete task")
       return
     }
+    toast.success("Task deleted")
     setTasks((current) => current.filter((task) => task.id !== taskId))
     setTaskDetailOpen(false)
   }
@@ -477,6 +628,81 @@ export default function TasksPage() {
     setNewLabelName("")
   }
 
+  async function addDependency() {
+    if (!user?.id || !selectedTask || !newDependencyId) return
+    const response = await fetch(`/api/tasks/${selectedTask.id}/dependencies`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id, dependsOnTaskId: Number(newDependencyId) }),
+    })
+    const data = await response.json()
+    if (!response.ok) {
+      toast.error(data.error ?? "Could not add dependency")
+      return
+    }
+    toast.success("Dependency added")
+    setSelectedTask((current) => current ? ({ ...current, dependencies: [data.dependency, ...current.dependencies] }) : current)
+    setNewDependencyId("")
+  }
+
+  async function removeDependency(depId: number) {
+    if (!user?.id || !selectedTask) return
+    const response = await fetch(`/api/tasks/${selectedTask.id}/dependencies/${depId}?userId=${user.id}`, { method: "DELETE" })
+    if (!response.ok) {
+      toast.error("Could not remove dependency")
+      return
+    }
+    toast.success("Dependency removed")
+    setSelectedTask((current) => current ? ({ ...current, dependencies: current.dependencies.filter(d => d.id !== depId) }) : current)
+  }
+
+  function toggleSelectTask(taskId: number) {
+    setSelectedTaskIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(taskId)) next.delete(taskId)
+      else next.add(taskId)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    if (selectedTaskIds.size === filteredTasks.length) {
+      setSelectedTaskIds(new Set())
+    } else {
+      setSelectedTaskIds(new Set(filteredTasks.map(t => t.id)))
+    }
+  }
+
+  async function handleBulkAction(action: string, value?: string) {
+    if (!user?.id || selectedTaskIds.size === 0) return
+    setIsBulkActing(true)
+    try {
+      const response = await fetch("/api/tasks/bulk", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, taskIds: Array.from(selectedTaskIds), action, value }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        toast.error(data.error ?? "Bulk action failed")
+        return
+      }
+      if (action === "delete") {
+        toast.success(`${data.deleted} tasks deleted`)
+        setTasks((current) => current.filter(t => !selectedTaskIds.has(t.id)))
+      } else if (action === "status") {
+        toast.success(`${data.updated} tasks updated to ${value}`)
+        setTasks((current) => current.map(t => selectedTaskIds.has(t.id) ? { ...t, status: value as Task["status"] } : t))
+      } else if (action === "priority") {
+        toast.success(`${data.updated} tasks updated to ${value} priority`)
+        setTasks((current) => current.map(t => selectedTaskIds.has(t.id) ? { ...t, priority: value as Task["priority"] } : t))
+      }
+      setSelectedTaskIds(new Set())
+    } finally {
+      setIsBulkActing(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -490,11 +716,26 @@ export default function TasksPage() {
           </DialogTrigger>
           <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Create Task</DialogTitle>
-              <DialogDescription>Add a task to one of your workspaces</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="grid gap-4 sm:grid-cols-2">
+            <DialogTitle>Create New Task</DialogTitle>
+            <DialogDescription>Add a new task to your workspace. Link it to a project and assign it to a team member.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {templates.length > 0 && (
+              <Field label="Apply Template">
+                <Select onValueChange={(id) => {
+                  const template = templates.find(t => String(t.id) === id)
+                  if (template) applyTemplate(template)
+                }}>
+                  <SelectTrigger><SelectValue placeholder="Select a template" /></SelectTrigger>
+                  <SelectContent>
+                    {templates.map(t => (
+                      <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+            <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Workspace">
                   <Select value={newTask.workspaceId} onValueChange={(value) => setNewTask((current) => ({ ...current, workspaceId: value, labelIds: [] }))}>
                     <SelectTrigger className="w-full"><SelectValue placeholder="Select workspace" /></SelectTrigger>
@@ -536,7 +777,7 @@ export default function TasksPage() {
                 <Input value={newTask.title} onChange={(event) => setNewTask((current) => ({ ...current, title: event.target.value }))} />
               </Field>
               <Field label="Description">
-                <Textarea value={newTask.description} onChange={(event) => setNewTask((current) => ({ ...current, description: event.target.value }))} />
+                <RichTextEditor value={newTask.description} onChange={(value) => setNewTask((current) => ({ ...current, description: value }))} />
               </Field>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Priority">
@@ -642,35 +883,49 @@ export default function TasksPage() {
           <Card>
             <CardContent className="p-0">
               {isLoading ? (
-                <div className="p-6 text-muted-foreground">Loading tasks...</div>
-              ) : filteredTasks.length === 0 ? (
-                <div className="p-6 text-muted-foreground">No tasks found. Create a workspace and add your first task.</div>
-              ) : (
-                <div className="divide-y divide-border">
-                  {filteredTasks.map((task) => (
-                    <div key={task.id} className={`flex items-center gap-4 p-4 transition-colors hover:bg-muted/50 ${task.status === "done" ? "opacity-60" : ""}`}>
-                      <Checkbox checked={task.status === "done"} onCheckedChange={() => toggleTaskComplete(task)} />
-                      <button type="button" className="min-w-0 flex-1 text-left" onClick={() => openTaskDetail(task.id)}>
-                        <p className={`truncate font-medium ${task.status === "done" ? "line-through" : ""}`}>{task.title}</p>
-                        <div className="mt-1 flex flex-wrap items-center gap-2">
-                          <span className="text-sm text-muted-foreground">{task.workspace}</span>
-                          {task.dueDate && <span className="flex items-center text-sm text-muted-foreground"><Calendar className="mr-1 h-3 w-3" />{task.dueDate}</span>}
-                          {task.subtasksTotal > 0 && <span className="text-xs text-muted-foreground">{task.subtasksCompleted}/{task.subtasksTotal} subtasks</span>}
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {task.labels.map((label) => (
-                            <Badge key={label.id} variant="outline" className="gap-1">{label.name}</Badge>
-                          ))}
-                        </div>
-                      </button>
-                      <div className="flex items-center gap-3">
-                        <Badge className={statusColors[task.status]}>{task.status.replace("-", " ")}</Badge>
-                        <Badge className={priorityColors[task.priority]}>{task.priority}</Badge>
-                        <Avatar className="h-8 w-8"><AvatarFallback className="text-xs">{task.assignee?.split(" ").map((part) => part[0]).join("") || "U"}</AvatarFallback></Avatar>
-                      </div>
-                    </div>
-                  ))}
+                <div className="p-4 space-y-4">
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
                 </div>
+              ) : filteredTasks.length === 0 ? (
+                <EmptyState
+                  icon={CheckSquare}
+                  title="No tasks found"
+                  description="Create a workspace and add your first task."
+                />
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 border-b border-border px-4 py-2">
+                    <Checkbox checked={selectedTaskIds.size === filteredTasks.length && filteredTasks.length > 0} onCheckedChange={toggleSelectAll} />
+                    <span className="text-xs text-muted-foreground">{selectedTaskIds.size > 0 ? `${selectedTaskIds.size} selected` : "Select all"}</span>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {filteredTasks.map((task) => (
+                      <div key={task.id} className={`flex items-center gap-4 p-4 transition-colors hover:bg-muted/50 ${task.status === "done" ? "opacity-60" : ""} ${selectedTaskIds.has(task.id) ? "bg-primary/5" : ""}`}>
+                        <Checkbox checked={selectedTaskIds.has(task.id)} onCheckedChange={() => toggleSelectTask(task.id)} />
+                        <button type="button" className="min-w-0 flex-1 text-left" onClick={() => openTaskDetail(task.id)}>
+                          <p className={`truncate font-medium ${task.status === "done" ? "line-through" : ""}`}>{task.title}</p>
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            <span className="text-sm text-muted-foreground">{task.workspace}</span>
+                            {task.dueDate && <span className="flex items-center text-sm text-muted-foreground"><Calendar className="mr-1 h-3 w-3" />{task.dueDate}</span>}
+                            {task.subtasksTotal > 0 && <span className="text-xs text-muted-foreground">{task.subtasksCompleted}/{task.subtasksTotal} subtasks</span>}
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {task.labels.map((label) => (
+                              <Badge key={label.id} variant="outline" className="gap-1">{label.name}</Badge>
+                            ))}
+                          </div>
+                        </button>
+                        <div className="flex items-center gap-3">
+                          <Badge className={statusColors[task.status]}>{task.status.replace("-", " ")}</Badge>
+                          <Badge className={priorityColors[task.priority]}>{task.priority}</Badge>
+                          <Avatar className="h-8 w-8"><AvatarFallback className="text-xs">{task.assignee?.split(" ").map((part) => part[0]).join("") || "U"}</AvatarFallback></Avatar>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -678,39 +933,29 @@ export default function TasksPage() {
 
         <TabsContent value="board">
           <ScrollArea className="pb-4">
-            <div className="flex gap-4 pb-4">
-              {groupedTasks.map((column) => (
-                <div key={column.id} className="w-80 flex-shrink-0 rounded-lg border border-border bg-muted/30">
-                  <div className="flex items-center justify-between border-b border-border p-3">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold">{column.title}</h3>
-                      <Badge variant="secondary" className="rounded-full px-2 py-0 text-xs">{column.tasks.length}</Badge>
+            <KanbanBoard
+              columns={columns}
+              tasks={filteredTasks}
+              onTaskMove={handleTaskMove}
+              renderTask={(task) => (
+                <Card className="cursor-grab hover:shadow-md transition-shadow active:cursor-grabbing border-border bg-card" onClick={() => openTaskDetail(task.id)}>
+                  <CardContent className="space-y-3 p-3">
+                    <div>
+                      <p className="font-medium">{task.title}</p>
+                      {task.description && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{task.description}</p>}
                     </div>
-                  </div>
-                  <div className="space-y-2 p-2">
-                    {column.tasks.map((task) => (
-                      <Card key={task.id} className="cursor-pointer" onClick={() => openTaskDetail(task.id)}>
-                        <CardContent className="space-y-3 p-3">
-                          <div>
-                            <p className="font-medium">{task.title}</p>
-                            {task.description && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{task.description}</p>}
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            <Badge className={priorityColors[task.priority]}>{task.priority}</Badge>
-                            {task.labels.slice(0, 2).map((label) => <Badge key={label.id} variant="outline">{label.name}</Badge>)}
-                          </div>
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>{task.workspace}</span>
-                            {task.dueDate && <span>{task.dueDate}</span>}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                    {!column.tasks.length && <p className="p-2 text-sm text-muted-foreground">No tasks</p>}
-                  </div>
-                </div>
-              ))}
-            </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge className={priorityColors[task.priority]}>{task.priority}</Badge>
+                      {task.labels.slice(0, 2).map((label) => <Badge key={label.id} variant="outline">{label.name}</Badge>)}
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{task.workspace}</span>
+                      {task.dueDate && <span>{task.dueDate}</span>}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            />
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
         </TabsContent>
@@ -767,8 +1012,11 @@ export default function TasksPage() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
+              <Field label="Time Tracking">
+                <TimeTracker taskId={selectedTask.id} userId={Number(user.id)} />
+              </Field>
               <Field label="Description">
-                <Textarea value={selectedTask.description ?? ""} onChange={(event) => setSelectedTask({ ...selectedTask, description: event.target.value })} />
+                <RichTextEditor value={selectedTask.description ?? ""} onChange={(value) => setSelectedTask({ ...selectedTask, description: value })} />
               </Field>
               <div className="grid gap-4 sm:grid-cols-3">
                 <Field label="Project">
@@ -893,11 +1141,11 @@ export default function TasksPage() {
                 </div>
               </Field>
               <Field label="Comments">
-                <div className="space-y-3">
-                  <div className="space-y-2">
+                <div className="space-y-4">
+                  <div className="space-y-3">
                     {selectedTask.comments.length === 0 ? (
                       <div className="rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground">
-                        No comments yet.
+                        No comments yet. Be the first to chime in!
                       </div>
                     ) : (
                       selectedTask.comments.map((comment) => (
@@ -908,7 +1156,15 @@ export default function TasksPage() {
                                 <span className="font-medium">{comment.userName ?? "Unknown user"}</span>
                                 <span className="text-muted-foreground">{formatDateTime(comment.createdAt)}</span>
                               </div>
-                              <p className="whitespace-pre-wrap text-sm text-foreground">{comment.body}</p>
+                              <p className="whitespace-pre-wrap text-sm text-foreground">
+                                {comment.body.split(/(@\w+)/g).map((part, i) => 
+                                  part.startsWith("@") ? (
+                                    <span key={i} className="font-semibold text-primary">{part}</span>
+                                  ) : (
+                                    part
+                                  )
+                                )}
+                              </p>
                             </div>
                             {String(comment.userId ?? "") === user?.id && (
                               <Button type="button" variant="ghost" size="icon" onClick={() => deleteComment(comment.id)}>
@@ -920,12 +1176,44 @@ export default function TasksPage() {
                       ))
                     )}
                   </div>
-                  <div className="space-y-2">
+                  <div className="relative space-y-2">
                     <Textarea
-                      placeholder="Add a comment"
+                      placeholder="Add a comment... Type @ to mention someone"
                       value={newCommentBody}
-                      onChange={(event) => setNewCommentBody(event.target.value)}
+                      onChange={(event) => {
+                        const val = event.target.value
+                        setNewCommentBody(val)
+                        const lastChar = val[event.target.selectionStart - 1]
+                        if (lastChar === "@") setShowMentionDropdown(true)
+                        else if (!val.includes("@") || lastChar === " ") setShowMentionDropdown(false)
+                      }}
                     />
+                    {showMentionDropdown && (
+                      <Card className="absolute bottom-full left-0 z-50 mb-2 w-48 shadow-xl">
+                        <ScrollArea className="h-48">
+                          <div className="p-1">
+                            {(membersByWorkspace[selectedTask.workspaceId] ?? []).map((member) => (
+                              <button
+                                key={member.id}
+                                type="button"
+                                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                                onClick={() => {
+                                  const parts = newCommentBody.split("@")
+                                  parts.pop()
+                                  setNewCommentBody(parts.join("@") + "@" + member.name.replace(/\s+/g, "") + " ")
+                                  setShowMentionDropdown(false)
+                                }}
+                              >
+                                <Avatar className="h-5 w-5 text-[10px]">
+                                  <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                                <span>{member.name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </Card>
+                    )}
                     <div className="flex justify-end">
                       <Button type="button" onClick={addComment} disabled={isSubmittingComment || !newCommentBody.trim()}>
                         <MessageSquare className="h-4 w-4" />
@@ -958,11 +1246,20 @@ export default function TasksPage() {
                         <div key={attachment.id} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <Paperclip className="h-4 w-4 text-muted-foreground" />
+                              {attachment.fileName.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                                <ImageIcon className="h-4 w-4 text-blue-500" />
+                              ) : (
+                                <Paperclip className="h-4 w-4 text-muted-foreground" />
+                              )}
                               <Link href={attachment.fileUrl} target="_blank" className="truncate text-sm font-medium hover:underline">
                                 {attachment.fileName}
                               </Link>
                             </div>
+                            {attachment.fileName.match(/\.(jpg|jpeg|png|gif|webp)$/i) && (
+                              <div className="mt-2 overflow-hidden rounded-md border">
+                                <img src={attachment.fileUrl} alt={attachment.fileName} className="h-20 w-auto object-cover" />
+                              </div>
+                            )}
                             <div className="mt-1 text-xs text-muted-foreground">
                               {formatFileSize(attachment.fileSizeBytes)}{attachment.uploadedByName ? ` • ${attachment.uploadedByName}` : ""}{attachment.createdAt ? ` • ${formatDateTime(attachment.createdAt)}` : ""}
                             </div>
@@ -978,14 +1275,98 @@ export default function TasksPage() {
                   )}
                 </div>
               </Field>
+              <Field label="Dependencies">
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <Select value={newDependencyId} onValueChange={setNewDependencyId}>
+                      <SelectTrigger className="flex-1"><SelectValue placeholder="Select task to depend on" /></SelectTrigger>
+                      <SelectContent>
+                        {filteredTasks.filter(t => t.id !== selectedTask.id && t.workspaceId === selectedTask.workspaceId).map((t) => (
+                          <SelectItem key={t.id} value={String(t.id)}>{t.title}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button type="button" variant="outline" onClick={addDependency}>Add</Button>
+                  </div>
+                  {selectedTask.dependencies.length > 0 && (
+                    <div className="space-y-2">
+                      {selectedTask.dependencies.map(dep => (
+                        <div key={dep.id} className="flex items-center justify-between rounded-md border border-border p-2">
+                          <div className="flex items-center gap-2">
+                            <Badge className={statusColors[dep.status as keyof typeof statusColors] || "bg-muted text-muted-foreground"}>{dep.status.replace("-", " ")}</Badge>
+                            <span className="text-sm font-medium">{dep.title}</span>
+                          </div>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeDependency(dep.id)}>
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </Field>
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTaskDetailOpen(false)}>Cancel</Button>
-            <Button onClick={saveTaskDetail}>Save Changes</Button>
+          <DialogFooter className="flex-row items-center justify-between sm:justify-between">
+            <Button variant="ghost" size="sm" onClick={saveAsTemplate} disabled={isSavingTemplate}>
+              <Tag className="mr-2 h-4 w-4" />
+              Save as Template
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setTaskDetailOpen(false)}>Cancel</Button>
+              <Button onClick={saveTaskDetail}>Save Changes</Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AnimatePresence>
+        {selectedTaskIds.size > 0 && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2"
+          >
+            <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-5 py-3 shadow-2xl backdrop-blur-md">
+              <span className="text-sm font-medium">{selectedTaskIds.size} selected</span>
+              <div className="mx-1 h-5 w-px bg-border" />
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={isBulkActing}>Move to…</Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  {columns.map((col) => (
+                    <DropdownMenuItem key={col.id} onClick={() => handleBulkAction("status", col.id)}>{col.title}</DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={isBulkActing}>Priority…</Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => handleBulkAction("priority", "urgent")}>Urgent</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleBulkAction("priority", "high")}>High</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleBulkAction("priority", "medium")}>Medium</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleBulkAction("priority", "low")}>Low</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Button variant="destructive" size="sm" disabled={isBulkActing} onClick={() => handleBulkAction("delete")}>
+                <Trash2 className="mr-1 h-3.5 w-3.5" />Delete
+              </Button>
+
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedTaskIds(new Set())}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -1058,3 +1439,4 @@ function formatFileSize(bytes: number | null) {
 
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
+

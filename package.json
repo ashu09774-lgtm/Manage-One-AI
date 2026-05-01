@@ -1,5 +1,5 @@
 {
-  "name": "taskflow-ai",
+  "name": "manage-one-ai",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -21,6 +21,9 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "1.2.12",
     "@radix-ui/react-alert-dialog": "1.1.15",
@@ -49,19 +52,27 @@
     "@radix-ui/react-toggle": "1.1.10",
     "@radix-ui/react-toggle-group": "1.1.11",
     "@radix-ui/react-tooltip": "1.2.8",
+    "@tiptap/react": "^3.22.5",
+    "@tiptap/starter-kit": "^3.22.5",
+    "@types/nodemailer": "^8.0.0",
     "@vercel/analytics": "1.6.1",
+    "@xyflow/react": "^12.10.2",
     "autoprefixer": "^10.4.20",
+    "axios": "^1.15.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.1.1",
     "date-fns": "4.1.0",
     "embla-carousel-react": "8.6.0",
+    "framer-motion": "^12.38.0",
     "google-auth-library": "^10.6.2",
+    "googleapis": "^171.4.0",
     "input-otp": "1.4.2",
     "lucide-react": "^0.564.0",
     "mysql2": "^3.22.3",
     "next": "16.2.4",
     "next-themes": "^0.4.6",
+    "nodemailer": "^8.0.7",
     "react": "^19",
     "react-day-picker": "9.13.2",
     "react-dom": "^19",
@@ -74,13 +85,20 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4.2.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.1",
+    "jsdom": "^28.1.0",
     "postcss": "^8.5",
     "tailwindcss": "^4.2.0",
     "tw-animate-css": "1.3.3",
-    "typescript": "5.7.3"
+    "typescript": "5.7.3",
+    "vitest": "^4.1.5"
   }
 }

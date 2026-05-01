@@ -1,8 +1,9 @@
-﻿import { NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import type { ResultSetHeader, RowDataPacket } from "mysql2"
 import { badRequest, getUserId, serverError } from "@/lib/api-utils"
 import { generateAssistantReply, getPromptTemplates, getUsageSummary, getTemplateById } from "@/lib/ai"
 import { db } from "@/lib/db"
+import { rateLimiter } from "@/lib/rate-limit"
 
 async function getConversationId(userId: number) {
   const [existing] = await db.execute<RowDataPacket[]>(
@@ -52,7 +53,7 @@ export async function GET(request: Request) {
 
     const templates = await getPromptTemplates(userId)
     const usage = await getUsageSummary(userId)
-    const provider = process.env.GEMINI_API_KEY ? "gemini" : "taskflow-local"
+    const provider = process.env.GEMINI_API_KEY ? "gemini" : "manage-one-local"
 
     return NextResponse.json({
       conversationId,
@@ -74,6 +75,16 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    // Rate limit: 10 AI requests per minute per IP
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown"
+    const rl = rateLimiter.limit(`assistant:${ip}`, { limit: 10, windowMs: 60_000 })
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: "Too many AI requests. Please wait a moment." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((rl.reset - Date.now()) / 1000)) } }
+      )
+    }
+
     const { userId, content, templateId, workspaceId } = await request.json()
     const parsedUserId = Number(userId)
     const message = String(content ?? "").trim()

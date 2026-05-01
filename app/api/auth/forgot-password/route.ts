@@ -1,16 +1,33 @@
 import { randomBytes } from "crypto"
 import { NextResponse } from "next/server"
 import type { ResultSetHeader, RowDataPacket } from "mysql2"
+import { z } from "zod"
 import { db } from "@/lib/db"
+import { rateLimiter } from "@/lib/rate-limit"
+import { sendPasswordResetEmail } from "@/lib/email"
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email("Valid email is required").transform((v) => v.trim().toLowerCase()),
+})
 
 export async function POST(request: Request) {
   try {
-    const { email } = await request.json()
-    const normalizedEmail = String(email ?? "").trim().toLowerCase()
-
-    if (!normalizedEmail) {
-      return NextResponse.json({ error: "Email is required" }, { status: 400 })
+    // Rate limit: 3 reset requests per minute per IP
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown"
+    const rl = rateLimiter.limit(`forgot-password:${ip}`, { limit: 3, windowMs: 60_000 })
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((rl.reset - Date.now()) / 1000)) } }
+      )
     }
+
+    const body = await request.json()
+    const parsed = forgotPasswordSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.errors[0]?.message ?? "Invalid input" }, { status: 400 })
+    }
+    const normalizedEmail = parsed.data.email
 
     const [[user]] = await db.execute<RowDataPacket[]>(
       "SELECT id FROM users WHERE email = ? LIMIT 1",
@@ -26,6 +43,8 @@ export async function POST(request: Request) {
       "INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 30 MINUTE))",
       [user.id, token]
     )
+
+    await sendPasswordResetEmail(normalizedEmail, token)
 
     return NextResponse.json({
       ok: true,

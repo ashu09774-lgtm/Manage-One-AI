@@ -1,4 +1,4 @@
-# TaskFlow AI Project Todo
+# Manage One AI Project Todo
 
 This file is the master execution checklist for the full project.
 
@@ -273,7 +273,7 @@ Implementation note:
 
 Implementation note:
 
-- Database completion now includes a finalized MySQL schema, foreign-key relationships, idempotent demo seed data, upload storage backup support, database backup/restore scripts, npm database scripts, and a resettable `taskflow_auth_test` setup.
+- Database completion now includes a finalized MySQL schema, foreign-key relationships, idempotent demo seed data, upload storage backup support, database backup/restore scripts, npm database scripts, and a resettable `Manage One_auth_test` setup.
 
 ## 20. UI and UX Completion
 
@@ -363,3 +363,4 @@ Implementation note:
 Implementation note:
 
 - Current progress is now summarized in `docs/PROGRESS_STATUS.md`, including completed sections, the remaining external Google OAuth verification item, next practical validation steps, and the full verification command set. The status is verified by `npm.cmd run test:progress`.
+

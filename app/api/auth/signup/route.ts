@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server"
 import type { ResultSetHeader, RowDataPacket } from "mysql2"
+import { z } from "zod"
 import { db } from "@/lib/db"
 import { hashPassword } from "@/lib/password"
+import { rateLimiter } from "@/lib/rate-limit"
 import { createSessionToken, sessionCookieName, sessionMaxAge } from "@/lib/session"
+
+const signupSchema = z.object({
+  name: z.string().min(1, "Name is required").max(120).transform((v) => v.trim()),
+  email: z.string().email("Please enter a valid email address").max(190).transform((v) => v.trim().toLowerCase()),
+  password: z.string().min(6, "Password must be at least 6 characters").max(200),
+})
 
 type ExistingUser = RowDataPacket & {
   id: number
@@ -10,22 +18,22 @@ type ExistingUser = RowDataPacket & {
 
 export async function POST(request: Request) {
   try {
-    const { name, email, password } = await request.json()
-    const trimmedName = String(name ?? "").trim()
-    const normalizedEmail = String(email ?? "").trim().toLowerCase()
-    const plainPassword = String(password ?? "")
-
-    if (!trimmedName || !normalizedEmail || !plainPassword) {
-      return NextResponse.json({ error: "Please fill in all fields" }, { status: 400 })
+    // Rate limit: 3 signups per minute per IP
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown"
+    const rl = rateLimiter.limit(`signup:${ip}`, { limit: 3, windowMs: 60_000 })
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: "Too many signup attempts. Please try again in a minute." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((rl.reset - Date.now()) / 1000)) } }
+      )
     }
 
-    if (!normalizedEmail.includes("@")) {
-      return NextResponse.json({ error: "Please enter a valid email address" }, { status: 400 })
+    const body = await request.json()
+    const parsed = signupSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.errors[0]?.message ?? "Invalid input" }, { status: 400 })
     }
-
-    if (plainPassword.length < 6) {
-      return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 })
-    }
+    const { name: trimmedName, email: normalizedEmail, password: plainPassword } = parsed.data
 
     const [existingUsers] = await db.execute<ExistingUser[]>("SELECT id FROM users WHERE email = ? LIMIT 1", [
       normalizedEmail,

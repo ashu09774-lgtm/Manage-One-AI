@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import type { ResultSetHeader, RowDataPacket } from "mysql2"
 import { badRequest, getUserId, serverError } from "@/lib/api-utils"
 import { db } from "@/lib/db"
+import { sendTeamInvitationEmail } from "@/lib/email"
 
 type MemberRow = RowDataPacket & {
   id: number
@@ -172,6 +173,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       `INSERT INTO invitations (workspace_id, email, role, token, invited_by, expires_at)
       VALUES (?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY))`,
       [workspaceId, invitedEmail, invitedRole, token, actorId]
+    )
+
+    const [[inviter]] = await db.execute<RowDataPacket[]>("SELECT name FROM users WHERE id = ? LIMIT 1", [actorId])
+    const [[workspace]] = await db.execute<RowDataPacket[]>("SELECT name FROM workspaces WHERE id = ? LIMIT 1", [workspaceId])
+
+    await sendTeamInvitationEmail(
+      invitedEmail,
+      inviter?.name ?? "A team member",
+      workspace?.name ?? "a workspace",
+      token
     )
 
     return NextResponse.json({

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -12,10 +12,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, Calendar, FolderKanban, GripVertical, Mail, Plus, Settings, Shield, Trash2, UserCog, Users } from "lucide-react"
+import { RichTextEditor } from "@/components/ui/rich-text-editor"
+import { KanbanBoard } from "@/components/tasks/kanban-board"
+import { toast } from "sonner"
+import { ArrowLeft, Bookmark, Calendar, FolderKanban, GripVertical, Mail, MessageSquare, Plus, Send, Settings, Shield, Trash2, UserCog, Users } from "lucide-react"
 
 interface UserData {
   id: string
@@ -78,6 +82,14 @@ interface WorkspaceProject {
   progress: number
 }
 
+interface WorkspaceChat {
+  id: number
+  userId: number
+  userName: string
+  message: string
+  createdAt: string
+}
+
 const columns = [
   { id: "todo", title: "To Do", color: "bg-muted-foreground" },
   { id: "in-progress", title: "In Progress", color: "bg-blue-500" },
@@ -105,9 +117,14 @@ export default function WorkspaceDetailPage() {
   const [projects, setProjects] = useState<WorkspaceProject[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [projectDialogOpen, setProjectDialogOpen] = useState(false)
-  const [draggedTask, setDraggedTask] = useState<WorkspaceTask | null>(null)
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(true)
+  const [chats, setChats] = useState<WorkspaceChat[]>([])
+  const [chatMessage, setChatMessage] = useState("")
+  const [isSendingChat, setIsSendingChat] = useState(false)
+  const [typingUsers, setTypingUsers] = useState<Record<number, string>>({})
+  const chatScrollRef = useRef<HTMLDivElement>(null)
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false)
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",
@@ -133,7 +150,7 @@ export default function WorkspaceDetailPage() {
   })
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("taskflow_user")
+    const storedUser = localStorage.getItem("manageone_user")
     if (storedUser) setUser(JSON.parse(storedUser))
   }, [])
 
@@ -192,6 +209,78 @@ export default function WorkspaceDetailPage() {
     }
   }
 
+  useEffect(() => {
+    if (!user?.id || !workspaceId) return
+
+    const eventSource = new EventSource(`/api/collaboration/stream?userId=${user.id}&workspaceId=${workspaceId}`)
+
+    eventSource.addEventListener("chat_message", (event) => {
+      const payload = JSON.parse((event as MessageEvent).data)
+      setChats((current) => [...current, payload])
+      if (payload.userId !== Number(user.id)) {
+        toast.info(`New message from ${payload.userName}`)
+      }
+    })
+
+    eventSource.addEventListener("typing", (event) => {
+      const payload = JSON.parse((event as MessageEvent).data)
+      if (payload.userId === Number(user.id)) return
+
+      setTypingUsers((current) => ({
+        ...current,
+        [payload.userId]: payload.userName,
+      }))
+
+      setTimeout(() => {
+        setTypingUsers((current) => {
+          const next = { ...current }
+          delete next[payload.userId]
+          return next
+        })
+      }, 3000)
+    })
+
+    return () => eventSource.close()
+  }, [user, workspaceId])
+
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
+    }
+  }, [chats])
+
+  async function loadChats() {
+    if (!user?.id) return
+    const response = await fetch(`/api/workspaces/${workspaceId}/chat?userId=${user.id}`)
+    const data = await response.json()
+    if (response.ok) setChats(data.chats)
+  }
+
+  async function sendChatMessage() {
+    if (!chatMessage.trim() || !user?.id || isSendingChat) return
+
+    setIsSendingChat(true)
+    try {
+      const response = await fetch(`/api/workspaces/${workspaceId}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, message: chatMessage.trim() }),
+      })
+      if (response.ok) setChatMessage("")
+    } finally {
+      setIsSendingChat(false)
+    }
+  }
+
+  async function handleTyping() {
+    if (!user?.id || !workspaceId) return
+    void fetch("/api/collaboration/typing", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id, workspaceId }),
+    })
+  }
+
   async function handleAddTask() {
     if (!newTask.title.trim() || !user?.id) return
 
@@ -213,9 +302,12 @@ export default function WorkspaceDetailPage() {
     const data = await response.json()
 
     if (!response.ok) {
+      toast.error(data.error ?? "Could not create task")
       setError(data.error ?? "Could not create task")
       return
     }
+
+    toast.success("Task created successfully")
 
     const assigneeName = members.find((member) => member.id === data.task.assigneeId)?.name ?? null
     setTasks((current) => [{ ...data.task, assignee: assigneeName }, ...current])
@@ -225,14 +317,20 @@ export default function WorkspaceDetailPage() {
     void refreshProjects()
   }
 
-  async function moveTask(task: WorkspaceTask, status: WorkspaceTask["status"]) {
-    if (!user?.id || task.status === status) return
+  async function handleTaskMove(taskId: string | number, newStatus: string, newIndex: number) {
+    if (!user?.id) return
+    const id = Number(taskId)
+    
+    const task = tasks.find(t => t.id === id)
+    if (!task) return
+    
+    const oldStatus = task.status
 
-    setTasks((current) => current.map((item) => item.id === task.id ? { ...item, status } : item))
-    const response = await fetch(`/api/tasks/${task.id}`, {
+    setTasks((current) => current.map((item) => item.id === id ? { ...item, status: newStatus as WorkspaceTask["status"] } : item))
+    const response = await fetch(`/api/tasks/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, status }),
+      body: JSON.stringify({ userId: user.id, status: newStatus }),
     })
 
     if (!response.ok) {
@@ -242,7 +340,7 @@ export default function WorkspaceDetailPage() {
 
     setWorkspace((current) => {
       if (!current) return current
-      const delta = task.status !== "done" && status === "done" ? 1 : task.status === "done" && status !== "done" ? -1 : 0
+      const delta = oldStatus !== "done" && newStatus === "done" ? 1 : oldStatus === "done" && newStatus !== "done" ? -1 : 0
       return { ...current, completedTasks: current.completedTasks + delta }
     })
     void refreshProjects()
@@ -264,9 +362,12 @@ export default function WorkspaceDetailPage() {
     const data = await response.json()
 
     if (!response.ok) {
+      toast.error(data.error ?? "Could not create project")
       setError(data.error ?? "Could not create project")
       return
     }
+
+    toast.success("Project created successfully")
 
     setProjects((current) => [data.project, ...current])
     setWorkspace((current) => current ? { ...current, projects: current.projects + 1 } : current)
@@ -289,9 +390,12 @@ export default function WorkspaceDetailPage() {
     const data = await response.json()
 
     if (!response.ok) {
+      toast.error(data.error ?? "Could not invite member")
       setError(data.error ?? "Could not invite member")
       return
     }
+    
+    toast.success("Invitation sent")
 
     if (data.member) {
       setMembers((current) => [...current, data.member])
@@ -319,9 +423,12 @@ export default function WorkspaceDetailPage() {
     const data = await response.json()
 
     if (!response.ok) {
+      toast.error(data.error ?? "Could not update member role")
       setError(data.error ?? "Could not update member role")
       return
     }
+
+    toast.success("Member role updated")
 
     setMembers((current) => current.map((member) => member.id === memberId ? { ...member, role: data.role } : member))
   }
@@ -335,9 +442,12 @@ export default function WorkspaceDetailPage() {
     const data = await response.json()
 
     if (!response.ok) {
+      toast.error(data.error ?? "Could not remove member")
       setError(data.error ?? "Could not remove member")
       return
     }
+
+    toast.success("Member removed")
 
     setMembers((current) => current.filter((member) => member.id !== memberId))
     setWorkspace((current) => current ? { ...current, members: Math.max(0, current.members - 1) } : current)
@@ -359,9 +469,12 @@ export default function WorkspaceDetailPage() {
     const data = await response.json()
 
     if (!response.ok) {
+      toast.error(data.error ?? "Could not save workspace settings")
       setError(data.error ?? "Could not save workspace settings")
       return
     }
+
+    toast.success("Workspace settings saved")
 
     setWorkspace((current) => current ? { ...current, ...data.workspace } : current)
   }
@@ -454,7 +567,7 @@ export default function WorkspaceDetailPage() {
                   <Input value={newTask.title} onChange={(event) => setNewTask((current) => ({ ...current, title: event.target.value }))} />
                 </Field>
                 <Field label="Description">
-                  <Textarea value={newTask.description} onChange={(event) => setNewTask((current) => ({ ...current, description: event.target.value }))} />
+                  <RichTextEditor value={newTask.description} onChange={(value) => setNewTask((current) => ({ ...current, description: value }))} />
                 </Field>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Project">
@@ -521,10 +634,109 @@ export default function WorkspaceDetailPage() {
         <TabsList className="flex flex-wrap">
           <TabsTrigger value="board">Board</TabsTrigger>
           <TabsTrigger value="projects">Projects</TabsTrigger>
+          <TabsTrigger value="chat" onClick={loadChats}>Chat</TabsTrigger>
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
           <TabsTrigger value="members">Members</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="chat">
+          <Card className="flex flex-col h-[600px]">
+            <CardHeader className="border-b">
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                Workspace Chat
+              </CardTitle>
+              <CardDescription>Real-time collaboration with your team members in this workspace.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-hidden p-0 relative">
+              <ScrollArea className="h-full p-4" ref={chatScrollRef}>
+                <div className="space-y-4">
+                  {chats.length === 0 ? (
+                    <div className="flex h-full items-center justify-center py-20 text-muted-foreground">
+                      No messages yet. Start the conversation!
+                    </div>
+                  ) : (
+                    chats.map((chat) => (
+                      <div key={chat.id} className={`flex flex-col ${chat.userId === Number(user?.id) ? "items-end" : "items-start"}`}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-semibold">{chat.userName}</span>
+                          <span className="text-[10px] text-muted-foreground">{new Date(chat.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        <div className={`rounded-2xl px-4 py-2 max-w-[80%] text-sm ${chat.userId === Number(user?.id) ? "bg-primary text-primary-foreground rounded-tr-none" : "bg-muted rounded-tl-none"}`}>
+                          {chat.message.split(/(@\w+)/g).map((part, i) => 
+                            part.startsWith("@") ? (
+                              <span key={i} className="font-semibold underline">{part}</span>
+                            ) : (
+                              part
+                            )
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+              
+              {Object.keys(typingUsers).length > 0 && (
+                <div className="absolute bottom-2 left-4 text-[10px] text-muted-foreground animate-pulse">
+                  {Object.values(typingUsers).join(", ")} {Object.keys(typingUsers).length === 1 ? "is" : "are"} typing...
+                </div>
+              )}
+            </CardContent>
+            <div className="p-4 border-t bg-muted/30 relative">
+              {showMentionDropdown && (
+                <Card className="absolute bottom-full left-4 z-50 mb-2 w-48 shadow-xl">
+                  <ScrollArea className="h-48">
+                    <div className="p-1">
+                      {members.map((member) => (
+                        <button
+                          key={member.id}
+                          type="button"
+                          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                          onClick={() => {
+                            const parts = chatMessage.split("@")
+                            parts.pop()
+                            setChatMessage(parts.join("@") + "@" + member.name.replace(/\s+/g, "") + " ")
+                            setShowMentionDropdown(false)
+                          }}
+                        >
+                          <Avatar className="h-5 w-5 text-[10px]">
+                            <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <span>{member.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </Card>
+              )}
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Type a message... @ to mention"
+                  value={chatMessage}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setChatMessage(val)
+                    handleTyping()
+                    const lastChar = val[e.target.selectionStart ?? 0 - 1]
+                    if (lastChar === "@") setShowMentionDropdown(true)
+                    else if (!val.includes("@") || lastChar === " ") setShowMentionDropdown(false)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault()
+                      sendChatMessage()
+                    }
+                  }}
+                />
+                <Button size="icon" onClick={sendChatMessage} disabled={!chatMessage.trim() || isSendingChat}>
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="board">
           <div className="space-y-4">
@@ -545,50 +757,41 @@ export default function WorkspaceDetailPage() {
             </Card>
 
             <ScrollArea className="pb-4">
-              <div className="flex gap-4 pb-4">
-                {groupedTasks.map((column) => (
-                  <div key={column.id} className="flex w-80 flex-shrink-0 flex-col rounded-lg border border-border bg-muted/30" onDragOver={(event) => event.preventDefault()} onDrop={() => draggedTask && moveTask(draggedTask, column.id)}>
-                    <div className="flex items-center justify-between border-b border-border p-3">
-                      <div className="flex items-center gap-2">
-                        <div className={`h-3 w-3 rounded-full ${column.color}`} />
-                        <h3 className="font-semibold">{column.title}</h3>
-                        <Badge variant="secondary" className="rounded-full px-2 py-0 text-xs">{column.tasks.length}</Badge>
-                      </div>
+              <KanbanBoard
+                columns={columns}
+                tasks={tasks}
+                onTaskMove={handleTaskMove}
+                renderColumnHeader={(column, taskCount) => (
+                  <div className="flex items-center justify-between border-b border-border p-3">
+                    <div className="flex items-center gap-2">
+                      <div className={`h-3 w-3 rounded-full ${column.color}`} />
+                      <h3 className="font-semibold">{column.title}</h3>
+                      <Badge variant="secondary" className="rounded-full px-2 py-0 text-xs">{taskCount}</Badge>
                     </div>
-                    <ScrollArea className="flex-1 p-2">
-                      <div className="space-y-2">
-                        {isLoading ? (
-                          <p className="p-2 text-sm text-muted-foreground">Loading...</p>
-                        ) : column.tasks.length === 0 ? (
-                          <p className="p-2 text-sm text-muted-foreground">No tasks</p>
-                        ) : (
-                          column.tasks.map((task) => (
-                            <Card key={task.id} className="cursor-grab border-border bg-card shadow-sm transition-all hover:shadow-md" draggable onDragStart={() => setDraggedTask(task)} onDragEnd={() => setDraggedTask(null)}>
-                              <CardContent className="p-3">
-                                <div className="mb-2 flex items-start gap-2">
-                                  <GripVertical className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                                  <div className="flex-1">
-                                    <p className="font-medium leading-tight">{task.title}</p>
-                                    {task.description && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{task.description}</p>}
-                                  </div>
-                                </div>
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <Badge className={`text-xs ${priorityColors[task.priority]}`}>{task.priority}</Badge>
-                                  {task.projectId && <Badge variant="outline">{projects.find((project) => project.id === task.projectId)?.name ?? "Project"}</Badge>}
-                                </div>
-                                <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-                                  <span>{task.assignee ?? "Unassigned"}</span>
-                                  {task.dueDate && <span>{task.dueDate}</span>}
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))
-                        )}
-                      </div>
-                    </ScrollArea>
                   </div>
-                ))}
-              </div>
+                )}
+                renderTask={(task) => (
+                  <Card className="cursor-grab border-border bg-card shadow-sm transition-all hover:shadow-md active:cursor-grabbing">
+                    <CardContent className="p-3">
+                      <div className="mb-2 flex items-start gap-2">
+                        <GripVertical className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                        <div className="flex-1">
+                          <p className="font-medium leading-tight">{task.title}</p>
+                          {task.description && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{task.description}</p>}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge className={`text-xs ${priorityColors[task.priority]}`}>{task.priority}</Badge>
+                        {task.projectId && <Badge variant="outline">{projects.find((project) => project.id === task.projectId)?.name ?? "Project"}</Badge>}
+                      </div>
+                      <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{task.assignee ?? "Unassigned"}</span>
+                        {task.dueDate && <span>{task.dueDate}</span>}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              />
               <ScrollBar orientation="horizontal" />
             </ScrollArea>
           </div>
@@ -844,3 +1047,5 @@ function formatDate(value: string) {
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleString([], { month: "short", day: "numeric", year: "numeric" })
 }
+
+

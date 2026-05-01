@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server"
 import type { RowDataPacket } from "mysql2"
+import { z } from "zod"
 import { db } from "@/lib/db"
 import { verifyPassword } from "@/lib/password"
+import { rateLimiter } from "@/lib/rate-limit"
 import { createSessionToken, sessionCookieName, sessionMaxAge } from "@/lib/session"
+
+const loginSchema = z.object({
+  email: z.string().email("Please enter a valid email address").transform((v) => v.trim().toLowerCase()),
+  password: z.string().min(1, "Password is required"),
+})
 
 type UserRow = RowDataPacket & {
   id: number
@@ -13,13 +20,22 @@ type UserRow = RowDataPacket & {
 
 export async function POST(request: Request) {
   try {
-    const { email, password } = await request.json()
-    const normalizedEmail = String(email ?? "").trim().toLowerCase()
-    const plainPassword = String(password ?? "")
-
-    if (!normalizedEmail || !plainPassword) {
-      return NextResponse.json({ error: "Please fill in all fields" }, { status: 400 })
+    // Rate limit: 5 login attempts per minute per IP
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown"
+    const rl = rateLimiter.limit(`login:${ip}`, { limit: 5, windowMs: 60_000 })
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: "Too many login attempts. Please try again in a minute." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((rl.reset - Date.now()) / 1000)) } }
+      )
     }
+
+    const body = await request.json()
+    const parsed = loginSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.errors[0]?.message ?? "Invalid input" }, { status: 400 })
+    }
+    const { email: normalizedEmail, password: plainPassword } = parsed.data
 
     const [users] = await db.execute<UserRow[]>(
       "SELECT id, name, email, password_hash FROM users WHERE email = ? LIMIT 1",

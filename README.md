@@ -1,6 +1,6 @@
-# TaskFlow AI
+# Manage One AI
 
-TaskFlow AI is a full-stack productivity workspace built with Next.js, MySQL, and a Python backend scaffold for future service expansion.
+Manage One AI is a full-stack productivity workspace built with Next.js, MySQL, and a Python backend scaffold for future service expansion.
 
 ## Stack
 
@@ -44,7 +44,7 @@ python -m uvicorn app.main:app --reload --port 8000
 - Session auth uses a signed HTTP-only cookie.
 - Forgot password works with reset tokens stored in MySQL.
 - Google sign-in is implemented and becomes active after setting `NEXT_PUBLIC_GOOGLE_CLIENT_ID`.
-- Seeded demo login, after running `.\database\migrate.ps1 -Seed`: `asha@example.com` / `TaskFlow123!`.
+- Seeded demo login, after running `.\database\migrate.ps1 -Seed`: `asha@example.com` / `Manage One123!`.
 
 ## Database Notes
 
@@ -89,3 +89,4 @@ python -m uvicorn app.main:app --reload --port 8000
 - Final product goals: [docs/PRODUCT_GOALS.md](./docs/PRODUCT_GOALS.md)
 - Recommended build order: [docs/BUILD_ORDER.md](./docs/BUILD_ORDER.md)
 - Progress status: [docs/PROGRESS_STATUS.md](./docs/PROGRESS_STATUS.md)
+

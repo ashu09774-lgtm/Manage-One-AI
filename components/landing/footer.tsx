@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -130,7 +130,7 @@ export function Footer() {
                 <div className="absolute -inset-1 -z-10 rounded-xl bg-primary/20 opacity-0 blur-lg transition-opacity duration-300 group-hover:opacity-100" />
               </div>
               <span className="text-lg font-bold tracking-tight">
-                Task<span className="bg-gradient-to-r from-primary to-chart-2 bg-clip-text text-transparent">Flow</span>
+                Manage <span className="bg-gradient-to-r from-primary to-chart-2 bg-clip-text text-transparent">One</span>
               </span>
             </Link>
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
@@ -193,7 +193,7 @@ export function Footer() {
 
           <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground/60">
-              <span>© {new Date().getFullYear()} TaskFlow AI</span>
+              <span>© {new Date().getFullYear()} Manage One AI</span>
               <span className="hidden text-border/40 md:inline">•</span>
               <span className="flex items-center gap-1">
                 Built with Next.js, MySQL & Gemini AI

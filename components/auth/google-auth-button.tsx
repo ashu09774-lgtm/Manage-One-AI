@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useEffect, useId, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -52,7 +52,7 @@ export function GoogleAuthButton({ mode }: { mode: "login" | "signup" }) {
             return
           }
 
-          localStorage.setItem("taskflow_user", JSON.stringify(data.user))
+          localStorage.setItem("manageone_user", JSON.stringify(data.user))
           router.push("/dashboard")
         },
       })
@@ -99,3 +99,4 @@ export function GoogleAuthButton({ mode }: { mode: "login" | "signup" }) {
     </div>
   )
 }
+

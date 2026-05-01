@@ -1,11 +1,11 @@
 import mysql from "mysql2/promise"
 
 declare global {
-  var taskflowDbPool: mysql.Pool | undefined
+  var manageOneDbPool: mysql.Pool | undefined
 }
 
 export const db =
-  globalThis.taskflowDbPool ??
+  globalThis.manageOneDbPool ??
   mysql.createPool({
     host: process.env.DB_HOST ?? "127.0.0.1",
     port: Number(process.env.DB_PORT ?? 3306),
@@ -17,5 +17,6 @@ export const db =
   })
 
 if (process.env.NODE_ENV !== "production") {
-  globalThis.taskflowDbPool = db
+  globalThis.manageOneDbPool = db
 }
+

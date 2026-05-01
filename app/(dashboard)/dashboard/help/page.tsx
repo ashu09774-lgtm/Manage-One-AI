@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -37,7 +37,7 @@ const faqs = [
   },
   {
     question: "What integrations are available?",
-    answer: "TaskFlow AI integrates with popular tools like Slack, Google Calendar, GitHub, and more. Visit the Settings page to connect your favorite tools and streamline your workflow."
+    answer: "Manage One AI integrates with popular tools like Slack, Google Calendar, GitHub, and more. Visit the Settings page to connect your favorite tools and streamline your workflow."
   },
   {
     question: "How do I switch between light and dark mode?",
@@ -61,7 +61,7 @@ const resources = [
   {
     icon: MessageCircle,
     title: "Community Forum",
-    description: "Connect with other TaskFlow users",
+    description: "Connect with other Manage One users",
     link: "#"
   },
   {

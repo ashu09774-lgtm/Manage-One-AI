@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -71,7 +71,8 @@ export function DashboardSidebar({ collapsed, setCollapsed, mobileOpen = false, 
       <aside
         aria-label="Dashboard navigation"
         className={cn(
-          "fixed left-0 top-0 z-50 flex h-screen w-64 flex-col border-r border-border bg-sidebar transition-transform duration-300 md:z-40 md:transition-all",
+          "fixed left-0 top-0 z-50 flex h-screen w-64 flex-col border-r border-border/50 transition-transform duration-300 md:z-40 md:transition-all",
+          "glass dark:glass",
           mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
           collapsed ? "md:w-16" : "md:w-64"
         )}
@@ -82,7 +83,7 @@ export function DashboardSidebar({ collapsed, setCollapsed, mobileOpen = false, 
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
             <Zap className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className={cn("text-lg font-bold", collapsed && "md:hidden")}>TaskFlow AI</span>
+          <span className={cn("text-lg font-bold", collapsed && "md:hidden")}>Manage One AI</span>
         </Link>
         <Button
           variant="ghost"

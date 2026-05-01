@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
@@ -22,6 +22,10 @@ import {
   Users,
   Zap,
 } from "lucide-react"
+import { AnimatedCard } from "@/components/ui/animated-card"
+import { EmptyState } from "@/components/ui/empty-state"
+import { cn } from "@/lib/utils"
+
 
 interface UserData {
   id: string
@@ -79,7 +83,7 @@ export default function DashboardPage() {
   const [error, setError] = useState("")
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("taskflow_user")
+    const storedUser = localStorage.getItem("manageone_user")
     if (storedUser) setUser(JSON.parse(storedUser))
   }, [])
 
@@ -116,33 +120,36 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       {/* Hero Header */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-br from-primary/[0.08] via-card to-chart-2/[0.06] p-6 sm:p-8">
-        {/* Decorative orbs */}
-        <div className="pointer-events-none absolute -right-20 -top-20 h-60 w-60 rounded-full bg-primary/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-chart-2/10 blur-3xl" />
-
-        <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
-              <Sparkles className="h-3 w-3" />
-              AI-Powered Dashboard
+      <div className="relative overflow-hidden rounded-3xl border border-border/50 bg-gradient-to-br from-primary/20 via-chart-2/10 to-chart-3/5 p-8 shadow-2xl animate-gradient-shift">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-80 w-80 rounded-full bg-primary/20 blur-[100px] animate-pulse-glow" />
+        <div className="pointer-events-none absolute -bottom-16 -left-16 h-64 w-64 rounded-full bg-chart-2/20 blur-[100px] animate-float-slow" />
+        
+        <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-primary backdrop-blur-md">
+              <Sparkles className="h-3.5 w-3.5 animate-pulse" />
+              Intelligence Layer Active
             </div>
-            <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
-              {greeting()}, {user?.name?.split(" ")[0] || "User"} 👋
-            </h1>
-            <p className="mt-1 text-muted-foreground">Here&apos;s what&apos;s happening across your workspaces today.</p>
+            <div>
+              <h1 className="text-3xl font-black tracking-tight sm:text-4xl lg:text-5xl">
+                {greeting()}, <span className="bg-gradient-to-r from-primary to-chart-2 bg-clip-text text-transparent">{user?.name?.split(" ")[0] || "User"}</span> 👋
+              </h1>
+              <p className="mt-3 max-w-xl text-lg text-muted-foreground/80 leading-relaxed">
+                Your workspace is optimized and synchronized. You have <span className="font-bold text-foreground">{stats.tasks} tasks</span> pending across <span className="font-bold text-foreground">{stats.workspaces} workspaces</span>.
+              </p>
+            </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-3">
             <Link href="/dashboard/assistant">
-              <Button variant="outline" className="gap-2 rounded-xl border-primary/20 bg-primary/5 text-primary hover:bg-primary/10">
-                <Bot className="h-4 w-4" />
-                AI Assistant
+              <Button size="lg" variant="outline" className="gap-2 rounded-2xl border-primary/20 bg-background/50 text-primary backdrop-blur-md hover:bg-primary/10 hover:border-primary/40 transition-all duration-300">
+                <Bot className="h-5 w-5" />
+                Assistant
               </Button>
             </Link>
             <Link href="/dashboard/tasks">
-              <Button className="gap-2 rounded-xl shadow-lg shadow-primary/20">
-                <Plus className="h-4 w-4" />
-                New Task
+              <Button size="lg" className="gap-2 rounded-2xl bg-primary shadow-xl shadow-primary/30 hover:shadow-primary/50 transition-all duration-500 group">
+                <Plus className="h-5 w-5 transition-transform group-hover:rotate-90" />
+                Quick Task
               </Button>
             </Link>
           </div>
@@ -160,6 +167,7 @@ export default function DashboardPage() {
           gradient="from-primary/10 to-primary/5"
           iconBg="bg-primary/10 text-primary"
           isLoading={isLoading}
+          className="animate-slide-up stagger-1"
         />
         <MetricCard
           title="Total Tasks"
@@ -168,6 +176,7 @@ export default function DashboardPage() {
           gradient="from-chart-2/10 to-chart-2/5"
           iconBg="bg-chart-2/10 text-chart-2"
           isLoading={isLoading}
+          className="animate-slide-up stagger-2"
         />
         <MetricCard
           title="Team Members"
@@ -176,6 +185,7 @@ export default function DashboardPage() {
           gradient="from-chart-5/10 to-chart-5/5"
           iconBg="bg-chart-5/10 text-chart-5"
           isLoading={isLoading}
+          className="animate-slide-up stagger-3"
         />
         <MetricCard
           title="Completion Rate"
@@ -186,14 +196,16 @@ export default function DashboardPage() {
           isLoading={isLoading}
           showProgress
           progressValue={stats.completionRate}
+          trend="↑ 5% from last week"
+          className="animate-slide-up stagger-4"
         />
       </div>
 
       {/* Main Content Grid */}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Recent Tasks */}
-        <Card className="card-glow lg:col-span-2 overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between">
+        <Card className="card-glow lg:col-span-2 overflow-hidden border-border/40 bg-card/40 backdrop-blur-xl transition-all duration-500">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-border/30 pb-6">
             <div>
               <CardTitle className="flex items-center gap-2">
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
@@ -226,19 +238,19 @@ export default function DashboardPage() {
                 ))}
               </div>
             ) : !data?.recentTasks.length ? (
-              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/60 bg-muted/10 py-12 text-center">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-                  <CheckSquare className="h-7 w-7 text-primary" />
-                </div>
-                <h3 className="mb-1 font-semibold">No tasks yet</h3>
-                <p className="mb-4 max-w-xs text-sm text-muted-foreground">Create your first task to start tracking your work and see progress here.</p>
-                <Link href="/dashboard/tasks">
-                  <Button size="sm" className="gap-1.5 rounded-lg">
-                    <Plus className="h-3.5 w-3.5" />
-                    Create First Task
-                  </Button>
-                </Link>
-              </div>
+              <EmptyState 
+                icon={CheckSquare}
+                title="No tasks yet"
+                description="Create your first task to start tracking your work and see progress here."
+                action={
+                  <Link href="/dashboard/tasks">
+                    <Button size="sm" className="gap-1.5 rounded-lg">
+                      <Plus className="h-3.5 w-3.5" />
+                      Create First Task
+                    </Button>
+                  </Link>
+                }
+              />
             ) : (
               <div className="space-y-2">
                 {data.recentTasks.map((task) => {
@@ -274,8 +286,8 @@ export default function DashboardPage() {
         </Card>
 
         {/* Team Activity */}
-        <Card className="card-glow overflow-hidden">
-          <CardHeader>
+        <Card className="card-glow overflow-hidden border-border/40 bg-card/40 backdrop-blur-xl transition-all duration-500">
+          <CardHeader className="border-b border-border/30 pb-6">
             <CardTitle className="flex items-center gap-2">
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-chart-5/10">
                 <Zap className="h-4 w-4 text-chart-5" />
@@ -298,15 +310,11 @@ export default function DashboardPage() {
                 ))}
               </div>
             ) : !data?.activity.length ? (
-              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/60 bg-muted/10 py-10 text-center">
-                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-chart-5/10">
-                  <Clock className="h-6 w-6 text-chart-5" />
-                </div>
-                <p className="text-sm font-medium">No activity yet</p>
-                <p className="mt-1 max-w-[200px] text-xs text-muted-foreground">
-                  Activity events will appear here as tasks and workspaces change.
-                </p>
-              </div>
+              <EmptyState 
+                icon={Clock}
+                title="No activity yet"
+                description="Activity events will appear here as tasks and workspaces change."
+              />
             ) : (
               <div className="space-y-4">
                 {data.activity.map((item) => (
@@ -336,8 +344,8 @@ export default function DashboardPage() {
       </div>
 
       {/* Active Workspaces */}
-      <Card className="card-glow overflow-hidden">
-        <CardHeader className="flex flex-row items-center justify-between">
+      <Card className="card-glow overflow-hidden border-border/40 bg-card/40 backdrop-blur-xl transition-all duration-500">
+        <CardHeader className="flex flex-row items-center justify-between border-b border-border/30 pb-6">
           <div>
             <CardTitle className="flex items-center gap-2">
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-chart-2/10">
@@ -368,19 +376,19 @@ export default function DashboardPage() {
               ))}
             </div>
           ) : !data?.projects.length ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/60 bg-muted/10 py-12 text-center">
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-chart-2/10">
-                <FolderKanban className="h-7 w-7 text-chart-2" />
-              </div>
-              <h3 className="mb-1 font-semibold">No workspaces yet</h3>
-              <p className="mb-4 max-w-xs text-sm text-muted-foreground">Create a workspace to organize your projects, tasks, and team collaboration.</p>
-              <Link href="/dashboard/workspaces">
-                <Button size="sm" className="gap-1.5 rounded-lg">
-                  <Plus className="h-3.5 w-3.5" />
-                  Create Workspace
-                </Button>
-              </Link>
-            </div>
+            <EmptyState 
+              icon={FolderKanban}
+              title="No workspaces yet"
+              description="Create a workspace to organize your projects, tasks, and team collaboration."
+              action={
+                <Link href="/dashboard/workspaces">
+                  <Button size="sm" className="gap-1.5 rounded-lg">
+                    <Plus className="h-3.5 w-3.5" />
+                    Create Workspace
+                  </Button>
+                </Link>
+              }
+            />
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {data.projects.map((project) => (
@@ -436,6 +444,8 @@ function MetricCard({
   isLoading,
   showProgress,
   progressValue,
+  trend,
+  className,
 }: {
   title: string
   value: string | number
@@ -445,9 +455,11 @@ function MetricCard({
   isLoading: boolean
   showProgress?: boolean
   progressValue?: number
+  trend?: string
+  className?: string
 }) {
   return (
-    <Card className={`card-glow group relative overflow-hidden bg-gradient-to-br ${gradient}`}>
+    <Card className={cn(`card-glow group relative overflow-hidden bg-gradient-to-br h-full transition-all duration-500 hover:scale-[1.02] ${gradient}`, className)}>
       {/* Hover glow line */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
 
@@ -462,7 +474,12 @@ function MetricCard({
           <div className="h-8 w-20 animate-pulse rounded-lg bg-muted" />
         ) : (
           <>
-            <div className="text-3xl font-bold tracking-tight">{value}</div>
+            <div className="text-3xl font-bold tracking-tight flex items-end gap-2">
+              {value}
+              {trend && (
+                <span className="text-xs font-medium text-emerald-500 mb-1">{trend}</span>
+              )}
+            </div>
             {showProgress && progressValue !== undefined && (
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted/50">
                 <div
@@ -491,3 +508,4 @@ function formatRelativeTime(value: string) {
   const diffDays = Math.round(diffHours / 24)
   return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`
 }
+

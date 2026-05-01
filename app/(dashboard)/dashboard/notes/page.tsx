@@ -1,6 +1,7 @@
-﻿"use client"
+"use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import React, { useEffect, useMemo, useRef, useState } from "react"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,7 +11,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Bold, FileText, History, Italic, Link2, ListChecks, Plus, RefreshCcw, Save, Search, Trash2 } from "lucide-react"
+import { toast } from "sonner"
+import { Bold, Eye, FileText, History, Italic, Link2, ListChecks, Plus, RefreshCcw, Save, Search, Trash2, Users } from "lucide-react"
 
 interface UserData {
   id: string
@@ -87,6 +89,9 @@ export default function NotesPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState("")
   const [liveNotice, setLiveNotice] = useState("")
+  const [showPreview, setShowPreview] = useState(false)
+  const [diffRevisionId, setDiffRevisionId] = useState<number | null>(null)
+  const [viewers, setViewers] = useState<Record<number, { name: string, status: string }>>({})
   const editorRef = useRef<HTMLDivElement>(null)
 
   function scrollToEditor() {
@@ -96,7 +101,7 @@ export default function NotesPage() {
   }
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("taskflow_user")
+    const storedUser = localStorage.getItem("manageone_user")
     if (storedUser) setUser(JSON.parse(storedUser))
   }, [])
 
@@ -114,6 +119,7 @@ export default function NotesPage() {
     if (!user?.id || selectedWorkspaceId === "all") return
 
     const eventSource = new EventSource(`/api/collaboration/stream?userId=${user.id}&workspaceId=${selectedWorkspaceId}`)
+    
     eventSource.addEventListener("note_updated", (event) => {
       const payload = JSON.parse((event as MessageEvent).data) as { id: number; title: string; action?: string; updatedBy?: number }
       if (payload.updatedBy !== Number(user.id)) {
@@ -122,8 +128,50 @@ export default function NotesPage() {
       }
     })
 
+    eventSource.addEventListener("note_presence", (event) => {
+      const payload = JSON.parse((event as MessageEvent).data) as { userId: number; userName: string; noteId: number; status: string }
+      if (payload.userId === Number(user.id) || payload.noteId !== draft.id) return
+
+      if (payload.status === "left") {
+        setViewers((current) => {
+          const next = { ...current }
+          delete next[payload.userId]
+          return next
+        })
+      } else {
+        setViewers((current) => ({
+          ...current,
+          [payload.userId]: { name: payload.userName, status: payload.status },
+        }))
+      }
+    })
+
     return () => eventSource.close()
-  }, [user, selectedWorkspaceId])
+  }, [user, selectedWorkspaceId, draft.id])
+
+  useEffect(() => {
+    if (!user?.id || !draft.id || !draft.workspaceId) return
+    
+    void broadcastPresence("viewing")
+    
+    const interval = setInterval(() => {
+      void broadcastPresence("viewing")
+    }, 10000)
+
+    return () => {
+      clearInterval(interval)
+      void broadcastPresence("left")
+    }
+  }, [user, draft.id, draft.workspaceId])
+
+  async function broadcastPresence(status: string) {
+    if (!user?.id || !draft.id || !draft.workspaceId) return
+    void fetch("/api/collaboration/notes/presence", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id, workspaceId: draft.workspaceId, noteId: draft.id, status }),
+    })
+  }
 
   const activeWorkspaceId = Number(draft.workspaceId)
   const availableProjects = activeWorkspaceId ? projectsByWorkspace[activeWorkspaceId] ?? [] : []
@@ -413,10 +461,26 @@ export default function NotesPage() {
 
           <TabsContent value="editor">
             <Card>
-              <CardHeader>
-                <CardTitle>{draft.id ? "Edit Note" : "Create Note"}</CardTitle>
-                <CardDescription>Use the toolbar for markdown formatting and save to publish changes to the workspace.</CardDescription>
-              </CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>{draft.id ? "Edit Note" : "Create New Note"}</CardTitle>
+              <CardDescription>Capture ideas, document processes, or link notes to specific tasks.</CardDescription>
+            </div>
+            {Object.keys(viewers).length > 0 && (
+              <div className="flex items-center gap-2">
+                <div className="flex -space-x-2">
+                  {Object.entries(viewers).map(([id, info]) => (
+                    <Avatar key={id} className="h-8 w-8 border-2 border-background ring-2 ring-primary/20">
+                      <AvatarFallback className="bg-primary/10 text-[10px] font-bold text-primary">{info.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                  ))}
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {Object.values(viewers).length} others {Object.values(viewers).some(v => v.status === "editing") ? "editing" : "viewing"}
+                </span>
+              </div>
+            )}
+          </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <Field label="Workspace">
@@ -463,13 +527,29 @@ export default function NotesPage() {
                   className="min-h-[420px] font-mono text-sm"
                   placeholder="Capture decisions, requirements, guides, and handoff details."
                 />
-                <div className="flex flex-wrap justify-end gap-2">
-                  {draft.id && <Button variant="ghost" onClick={deleteNote}><Trash2 className="h-4 w-4" />Delete</Button>}
-                  <Button onClick={saveNote} disabled={isSaving || !draft.workspaceId || !draft.title.trim()}>
-                    <Save className="h-4 w-4" />
-                    {draft.id ? "Save Changes" : "Create Note"}
+                <div className="flex flex-wrap justify-between gap-2">
+                  <Button
+                    type="button"
+                    variant={showPreview ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShowPreview(!showPreview)}
+                  >
+                    <Eye className="h-4 w-4" />
+                    {showPreview ? "Edit" : "Preview"}
                   </Button>
+                  <div className="flex flex-wrap gap-2">
+                    {draft.id && <Button variant="ghost" onClick={deleteNote}><Trash2 className="h-4 w-4" />Delete</Button>}
+                    <Button onClick={saveNote} disabled={isSaving || !draft.workspaceId || !draft.title.trim()}>
+                      <Save className="h-4 w-4" />
+                      {draft.id ? "Save Changes" : "Create Note"}
+                    </Button>
+                  </div>
                 </div>
+                {showPreview && (
+                  <div className="rounded-lg border border-border p-4">
+                    <div className="prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: renderMarkdown(draft.content) }} />
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -517,16 +597,35 @@ export default function NotesPage() {
               <CardContent className="space-y-3">
                 {revisions.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Save a note to start revision history.</p>
-                ) : revisions.map((revision) => (
+                ) : revisions.map((revision, index) => (
                   <div key={revision.id} className="rounded-lg border border-border p-4">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <div className="font-medium">{revision.title}</div>
                         <div className="text-xs text-muted-foreground">{revision.editedByName ?? "Unknown user"} - {formatDateTime(revision.createdAt)}</div>
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => setDraft((current) => ({ ...current, title: revision.title, content: revision.content }))}>Restore</Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setDiffRevisionId(diffRevisionId === revision.id ? null : revision.id)}
+                        >
+                          {diffRevisionId === revision.id ? "Hide Diff" : "Show Diff"}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => { setDraft((current) => ({ ...current, title: revision.title, content: revision.content })); toast.success("Revision restored to editor") }}>Restore</Button>
+                      </div>
                     </div>
-                    <p className="mt-3 line-clamp-3 whitespace-pre-wrap text-sm text-muted-foreground">{revision.content || "Empty revision"}</p>
+                    {diffRevisionId === revision.id && (
+                      <div className="mt-3 rounded-md bg-muted/50 p-3 font-mono text-xs overflow-auto max-h-[300px]">
+                        {renderDiff(
+                          index < revisions.length - 1 ? revisions[index + 1].content : "",
+                          revision.content
+                        )}
+                      </div>
+                    )}
+                    {diffRevisionId !== revision.id && (
+                      <p className="mt-3 line-clamp-3 whitespace-pre-wrap text-sm text-muted-foreground">{revision.content || "Empty revision"}</p>
+                    )}
                   </div>
                 ))}
               </CardContent>
@@ -574,3 +673,77 @@ function formatDateTime(value: string) {
     minute: "2-digit",
   })
 }
+
+function renderMarkdown(text: string): string {
+  if (!text) return "<p class='text-muted-foreground'>Nothing to preview.</p>"
+
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    // Headings
+    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
+    .replace(/^## (.+)$/gm, "<h2>$1</h2>")
+    .replace(/^# (.+)$/gm, "<h1>$1</h1>")
+    // Bold & italic
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/__(.+?)__/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/_(.+?)_/g, "<em>$1</em>")
+    // Inline code
+    .replace(/`(.+?)`/g, "<code class='bg-muted px-1 py-0.5 rounded text-sm'>$1</code>")
+    // Links
+    .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" class="text-primary underline" target="_blank">$1</a>')
+    // Unordered lists
+    .replace(/^- (.+)$/gm, "<li>$1</li>")
+    // Paragraphs (double newlines)
+    .replace(/\n\n/g, "</p><p>")
+    // Single newlines
+    .replace(/\n/g, "<br/>")
+    // Wrap in paragraph
+    .replace(/^/, "<p>")
+    .replace(/$/, "</p>")
+}
+
+function renderDiff(oldText: string, newText: string) {
+  const oldLines = (oldText || "").split("\n")
+  const newLines = (newText || "").split("\n")
+  const maxLen = Math.max(oldLines.length, newLines.length)
+  const result: React.ReactNode[] = []
+
+  // Simple line-by-line comparison
+  const oldSet = new Set(oldLines)
+  const newSet = new Set(newLines)
+
+  // Show removed lines first, then added
+  for (let i = 0; i < maxLen; i++) {
+    if (i < oldLines.length && !newSet.has(oldLines[i]) && oldLines[i].trim()) {
+      result.push(
+        <div key={`old-${i}`} className="text-red-500 bg-red-500/10 px-2 py-0.5 rounded">
+          - {oldLines[i]}
+        </div>
+      )
+    }
+    if (i < newLines.length && !oldSet.has(newLines[i]) && newLines[i].trim()) {
+      result.push(
+        <div key={`new-${i}`} className="text-green-500 bg-green-500/10 px-2 py-0.5 rounded">
+          + {newLines[i]}
+        </div>
+      )
+    }
+    if (i < newLines.length && oldSet.has(newLines[i]) && newLines[i].trim()) {
+      result.push(
+        <div key={`same-${i}`} className="text-muted-foreground px-2 py-0.5">
+          &nbsp; {newLines[i]}
+        </div>
+      )
+    }
+  }
+
+  if (result.length === 0) {
+    return <div className="text-muted-foreground">No differences found.</div>
+  }
+
+  return <>{result}</>
+}
+
