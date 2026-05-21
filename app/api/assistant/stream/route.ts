@@ -1,4 +1,4 @@
-import { getUserId, badRequest, serverError } from "@/lib/api-utils"
+import { getUserId, badRequest, serverError, getAuthenticatedUserId } from "@/lib/api-utils"
 import { generateAssistantStream, getTemplateById, summarizeConversation } from "@/lib/ai"
 import { db } from "@/lib/db"
 import type { ResultSetHeader, RowDataPacket } from "mysql2"
@@ -23,10 +23,13 @@ async function getConversationId(userId: number) {
 
 export async function POST(request: Request) {
   try {
-    const userId = getUserId(request)
+    const sessionUserId = await getAuthenticatedUserId(request)
+    const body = await request.json()
+    const { content, templateId, workspaceId, userId: bodyUserId } = body
+    
+    const userId = sessionUserId || Number(bodyUserId)
+    
     if (!userId) return badRequest("Missing user id")
-
-    const { content, templateId, workspaceId } = await request.json()
     if (!content?.trim()) return badRequest("Message is required")
 
     const conversationId = await getConversationId(userId)

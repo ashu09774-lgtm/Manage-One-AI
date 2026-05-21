@@ -5,32 +5,32 @@ test.describe("Authentication and Navigation", () => {
     // Navigate to the landing page
     await page.goto("/")
 
-    // Expect the title to contain "TaskFlow AI"
-    await expect(page).toHaveTitle(/TaskFlow AI/i)
+    // Expect the title to contain the current product name
+    await expect(page).toHaveTitle(/Manage One AI/i)
 
     // Find the login link and click it
-    const loginLink = page.getByRole("link", { name: "Log in" })
+    const loginLink = page.getByRole("link", { name: "Sign In" }).first()
     await loginLink.click()
 
     // Expect the URL to be /login
     await expect(page).toHaveURL(/.*\/login/)
 
     // Expect the login form to be visible
-    await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible()
-    await expect(page.getByLabel("Email address")).toBeVisible()
-    await expect(page.getByLabel("Password")).toBeVisible()
-    await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible()
+    await expect(page.getByText("Welcome back")).toBeVisible()
+    await expect(page.getByLabel("Email")).toBeVisible()
+    await expect(page.locator("#password")).toBeVisible()
+    await expect(page.getByRole("button", { name: "Sign In" })).toBeVisible()
   })
 
   test("shows error on invalid login", async ({ page }) => {
     await page.goto("/login")
 
     // Fill in invalid credentials
-    await page.getByLabel("Email address").fill("invalid@example.com")
-    await page.getByLabel("Password").fill("wrongpassword")
+    await page.getByLabel("Email").fill("invalid@example.com")
+    await page.locator("#password").fill("wrongpassword")
 
     // Click submit
-    await page.getByRole("button", { name: "Sign in" }).click()
+    await page.getByRole("button", { name: "Sign In" }).click()
 
     // Expect an error message (could be "Invalid credentials" or similar depending on the exact implementation)
     // Wait for the response and error message to appear

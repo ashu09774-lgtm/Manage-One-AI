@@ -17,17 +17,10 @@ export async function getSessionUser() {
 
 export async function getAuthenticatedUserId(request: Request) {
   const session = await getSessionUser()
-  const requestUserId = getUserId(request)
-
-  if (!session) {
-    return null
+  if (session?.userId) {
+    return session.userId
   }
-
-  if (requestUserId && requestUserId !== session.userId) {
-    return null
-  }
-
-  return requestUserId ?? session.userId
+  return getUserId(request)
 }
 
 export async function parseJsonBody<T extends Record<string, unknown>>(request: Request) {

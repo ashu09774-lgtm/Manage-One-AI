@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { badRequest, serverError } from "@/lib/api-utils"
-import type { RowDataPacket } from "mysql2"
+import type { ResultSetHeader, RowDataPacket } from "mysql2"
 
 export async function PATCH(request: Request) {
   try {

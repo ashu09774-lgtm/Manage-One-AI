@@ -11,7 +11,17 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Bot, Brain, FileText, Lightbulb, NotebookText, Save, Send, Sparkles, Trash2, User, WandSparkles, Zap } from "lucide-react"
+import { Separator } from "@/components/ui/separator"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import { toast } from "sonner"
+import { Bot, Brain, FileText, Lightbulb, NotebookText, Save, Send, Sparkles, Trash2, User, WandSparkles, Zap, Loader2, Shield, Plus } from "lucide-react"
 
 interface UserData {
   id: string
@@ -118,8 +128,12 @@ export default function AssistantPage() {
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("manageone_user")
-    if (storedUser) setUser(JSON.parse(storedUser))
+    try {
+      const storedUser = localStorage.getItem("manageone_user")
+      if (storedUser) setUser(JSON.parse(storedUser))
+    } catch (err) {
+      console.error("Failed to parse user from localStorage", err)
+    }
   }, [])
 
   useEffect(() => {
@@ -140,20 +154,35 @@ export default function AssistantPage() {
 
   async function loadAssistantData() {
     if (!user?.id) return
+    setError("")
 
     const response = await fetch(`/api/assistant?userId=${user.id}`)
-    const data = await response.json()
-
+    
     if (!response.ok) {
-      setError(data.error ?? "Could not load assistant")
+      let errorMsg = "Could not load assistant"
+      try {
+        const data = await response.json()
+        errorMsg = data.error ?? errorMsg
+      } catch (e) {
+        errorMsg = `Server error (${response.status})`
+      }
+      setError(errorMsg)
       return
     }
 
-    setMessages(data.messages)
-    setProvider(data.provider)
-    setTemplates(data.templates)
-    setWorkspaces(data.workspaces)
-    setUsage(data.usage)
+    let data
+    try {
+      data = await response.json()
+    } catch (e) {
+      setError("Failed to parse assistant data")
+      return
+    }
+
+    setMessages(data.messages || [])
+    setProvider(data.provider || "manage-one-local")
+    setTemplates(data.templates || [])
+    setWorkspaces(data.workspaces || [])
+    setUsage(data.usage || { requests: 0, inputChars: 0, outputChars: 0, lastUsedAt: null })
     await loadAgentRuns(data.workspaces)
     if (data.templates.length > 0) {
       setSelectedTemplateId((current) => current || data.templates[0].id)
@@ -162,17 +191,32 @@ export default function AssistantPage() {
 
   async function loadAgentRuns(existingWorkspaces?: WorkspaceOption[]) {
     if (!user?.id) return
+    setError("")
 
     const response = await fetch(`/api/agents?userId=${user.id}`)
-    const data = await response.json()
-
+    
     if (!response.ok) {
-      setError(data.error ?? "Could not load agent runs")
+      let errorMsg = "Could not load agents"
+      try {
+        const data = await response.json()
+        errorMsg = data.error ?? errorMsg
+      } catch (e) {
+        errorMsg = `Agents API error (${response.status})`
+      }
+      setError(errorMsg)
       return
     }
 
-    setAgents(data.agents)
-    setAgentRuns(data.runs)
+    let data
+    try {
+      data = await response.json()
+    } catch (e) {
+      setError("Failed to parse agents data")
+      return
+    }
+
+    setAgents(data.agents || [])
+    setAgentRuns(data.runs || [])
     const firstRun = data.runs[0]
     if (firstRun) {
       await loadAgentRunDetail(firstRun.id)
@@ -186,10 +230,24 @@ export default function AssistantPage() {
 
   async function loadAgentRunDetail(runId: number) {
     const response = await fetch(`/api/agents/${runId}?userId=${user?.id}`)
-    const data = await response.json()
-
+    
     if (!response.ok) {
-      setError(data.error ?? "Could not load agent run")
+      let errorMsg = "Could not load agent detail"
+      try {
+        const data = await response.json()
+        errorMsg = data.error ?? errorMsg
+      } catch (e) {
+        errorMsg = `Agent Detail error (${response.status})`
+      }
+      setError(errorMsg)
+      return
+    }
+
+    let data
+    try {
+      data = await response.json()
+    } catch (e) {
+      setError("Failed to parse agent detail data")
       return
     }
 
@@ -469,61 +527,120 @@ export default function AssistantPage() {
           <TabsTrigger value="prompts">Prompt Management</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="chat">
-          <div className="grid gap-6 xl:grid-cols-[1.4fr,0.6fr]">
-            <Card className="flex h-[680px] flex-col">
-              <CardHeader className="border-b">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary">
-                      <Bot className="h-5 w-5 text-primary-foreground" />
+        <TabsContent value="chat" className="m-0 h-[calc(100vh-220px)] min-h-[500px]">
+          <div className="flex h-full gap-6 overflow-hidden">
+            <Card className="flex flex-1 flex-col overflow-hidden shadow-md">
+              <CardHeader className="shrink-0 border-b bg-card/50 p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <Bot className="h-5 w-5" />
                     </div>
-                    <div>
-                      <CardTitle className="text-lg">Manage One AI</CardTitle>
-                      <CardDescription>
-                        {selectedTemplate ? `${selectedTemplate.name} is active` : "Select a template to guide replies"}
+                    <div className="min-w-0">
+                      <CardTitle className="truncate text-base">Manage One AI</CardTitle>
+                      <CardDescription className="truncate text-xs">
+                        {selectedTemplate ? selectedTemplate.name : "Select a template"}
                       </CardDescription>
                     </div>
                   </div>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <Select value={selectedWorkspaceId} onValueChange={setSelectedWorkspaceId}>
-                      <SelectTrigger className="w-full min-w-[180px]"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Workspaces</SelectItem>
-                        {workspaces.map((workspace) => <SelectItem key={workspace.id} value={String(workspace.id)}>{workspace.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
-                      <SelectTrigger className="w-full min-w-[220px]"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {templates.map((template) => <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                  
+                  <div className="flex items-center gap-2">
+                    <div className="hidden lg:flex items-center gap-2">
+                      <Select value={selectedWorkspaceId} onValueChange={setSelectedWorkspaceId}>
+                        <SelectTrigger className="h-8 w-[140px] text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Workspaces</SelectItem>
+                          {workspaces.map((workspace) => <SelectItem key={workspace.id} value={String(workspace.id)}>{workspace.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                        <SelectTrigger className="h-8 w-[160px] text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {templates.map((template) => <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <Sheet>
+                      <SheetTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 xl:hidden">
+                          <Shield className="h-4 w-4" />
+                        </Button>
+                      </SheetTrigger>
+                      <SheetContent>
+                        <SheetHeader>
+                          <SheetTitle>Template Details</SheetTitle>
+                          <SheetDescription>Prompt guidance currently active</SheetDescription>
+                        </SheetHeader>
+                        <div className="mt-6 space-y-6">
+                          {selectedTemplate ? (
+                            <>
+                              <div className="space-y-1">
+                                <div className="text-sm font-bold">{selectedTemplate.name}</div>
+                                <div className="flex gap-2">
+                                  <Badge variant="secondary" className="text-[10px]">{selectedTemplate.source}</Badge>
+                                  <Badge variant="outline" className="text-[10px]">{selectedTemplate.category}</Badge>
+                                </div>
+                              </div>
+                              <div className="space-y-4">
+                                <div className="space-y-1.5">
+                                  <div className="text-xs font-bold uppercase text-muted-foreground">System Prompt</div>
+                                  <div className="text-xs leading-relaxed text-muted-foreground bg-muted p-3 rounded-lg">
+                                    {selectedTemplate.systemPrompt}
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <p className="text-sm text-muted-foreground text-center">No template selected</p>
+                          )}
+                        </div>
+                      </SheetContent>
+                    </Sheet>
                   </div>
                 </div>
               </CardHeader>
 
-              <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-                <div className="space-y-4">
+              <ScrollArea className="flex-1 px-4" ref={scrollRef}>
+                <div className="space-y-6 py-6">
                   {messages.length === 0 && !streamingMessage ? (
-                    <p className="p-4 text-center text-sm text-muted-foreground">No messages yet. Ask for a task plan, summary, or recommendation.</p>
+                    <div className="flex h-[300px] flex-col items-center justify-center text-center opacity-60">
+                      <div className="mb-4 rounded-full bg-primary/5 p-4 text-primary">
+                        <Bot className="h-10 w-10" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-foreground">Assistant Ready</h3>
+                      <p className="max-w-[240px] text-sm text-muted-foreground">Select a template and start chatting to get productivity help.</p>
+                    </div>
                   ) : (
                     <>
                       {messages.map((message) => (
                         <div key={message.id} className={`flex items-start gap-3 ${message.role === "user" ? "flex-row-reverse" : ""}`}>
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className={message.role === "assistant" ? "bg-primary text-primary-foreground" : "bg-muted"}>
-                              {message.role === "assistant" ? <Bot className="h-4 w-4" /> : <User className="h-4 w-4" />}
+                          <Avatar className="h-8 w-8 shrink-0 shadow-sm">
+                            <AvatarFallback className={message.role === "assistant" ? "bg-primary text-primary-foreground font-bold" : "bg-muted"}>
+                              {message.role === "assistant" ? "AI" : "U"}
                             </AvatarFallback>
                           </Avatar>
-                          <div className={`max-w-[85%] rounded-lg p-3 ${message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-                            <p className="whitespace-pre-wrap text-sm">{message.content}</p>
-                            <p className="mt-1 text-xs opacity-70">{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
+                          <div className={`group relative max-w-[80%] rounded-2xl px-4 py-2.5 shadow-sm transition-all ${
+                            message.role === "user" 
+                              ? "bg-primary text-primary-foreground rounded-tr-none" 
+                              : "bg-card border rounded-tl-none hover:bg-muted/30"
+                          }`}>
+                            <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{message.content}</p>
+                            <div className={`mt-1.5 flex items-center gap-2 text-[10px] ${message.role === "user" ? "opacity-70 justify-end" : "text-muted-foreground"}`}>
+                              {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </div>
+                            
                             {message.role === "assistant" && message.content.includes("```json") && (
-                              <div className="mt-3 border-t border-border pt-3">
-                                <Button size="sm" variant="outline" className="gap-2" onClick={() => convertToTasks(message.content)} disabled={isCreatingTasks}>
-                                  <Plus className="h-4 w-4" />
-                                  Convert to Tasks
+                              <div className="mt-3 border-t pt-3">
+                                <Button 
+                                  size="sm" 
+                                  variant="secondary" 
+                                  className="h-8 w-full gap-2 text-[11px] font-semibold" 
+                                  onClick={() => convertToTasks(message.content)} 
+                                  disabled={isCreatingTasks}
+                                >
+                                  {isCreatingTasks ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                                  Convert to Actionable Tasks
                                 </Button>
                               </div>
                             )}
@@ -532,14 +649,12 @@ export default function AssistantPage() {
                       ))}
                       {streamingMessage !== null && (
                         <div className="flex items-start gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="bg-primary text-primary-foreground">
-                              <Bot className="h-4 w-4" />
-                            </AvatarFallback>
+                          <Avatar className="h-8 w-8 shrink-0 shadow-sm">
+                            <AvatarFallback className="bg-primary text-primary-foreground font-bold">AI</AvatarFallback>
                           </Avatar>
-                          <div className="max-w-[85%] rounded-lg bg-muted p-3">
-                            <p className="whitespace-pre-wrap text-sm">{streamingMessage}</p>
-                            <span className="mt-1 inline-block h-4 w-1 animate-pulse bg-primary" />
+                          <div className="max-w-[80%] rounded-2xl rounded-tl-none border bg-card px-4 py-2.5 shadow-sm">
+                            <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{streamingMessage}</p>
+                            <span className="mt-1 inline-block h-4 w-1 animate-pulse bg-primary/40 rounded-full" />
                           </div>
                         </div>
                       )}
@@ -548,61 +663,84 @@ export default function AssistantPage() {
                 </div>
               </ScrollArea>
 
-              <div className="border-t p-4">
+              <div className="shrink-0 border-t bg-card/50 p-4">
                 <form
                   onSubmit={(event) => {
                     event.preventDefault()
-                    void handleSend()
+                    if (input.trim() && !isSending) void handleSend()
                   }}
-                  className="space-y-3"
+                  className="relative flex items-center gap-2"
                 >
                   <Textarea
                     value={input}
                     onChange={(event) => setInput(event.target.value)}
-                    placeholder="Ask for task generation, a meeting summary, a document summary, or productivity advice..."
-                    className="min-h-24"
+                    placeholder="Ask anything..."
+                    className="min-h-[44px] max-h-32 flex-1 resize-none bg-background py-3 focus-visible:ring-primary/20"
                     disabled={isSending}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault()
+                        if (input.trim() && !isSending) void handleSend()
+                      }
+                    }}
                   />
-                  <div className="flex justify-end">
-                    <Button type="submit" disabled={!input.trim() || isSending}>
-                      <Send className="h-4 w-4" />
-                      Send
-                    </Button>
-                  </div>
+                  <Button type="submit" size="icon" className="h-11 w-11 shrink-0 shadow-lg" disabled={!input.trim() || isSending}>
+                    {isSending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                  </Button>
                 </form>
+                <div className="mt-2 text-center text-[10px] text-muted-foreground opacity-50">
+                  Manage One AI can make mistakes. Verify important info.
+                </div>
               </div>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Template Details</CardTitle>
-                <CardDescription>Prompt guidance currently shaping the assistant reply.</CardDescription>
+            <Card className="hidden w-80 flex-col overflow-hidden shadow-sm xl:flex">
+              <CardHeader className="shrink-0 border-b p-4">
+                <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Template Details</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {selectedTemplate ? (
-                  <>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-medium">{selectedTemplate.name}</span>
-                        <Badge variant={selectedTemplate.source === "custom" ? "default" : "secondary"}>{selectedTemplate.source}</Badge>
+              <ScrollArea className="flex-1">
+                <CardContent className="space-y-6 p-4">
+                  {selectedTemplate ? (
+                    <>
+                      <div className="space-y-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-[11px] font-bold text-primary uppercase">Active Persona</Label>
+                          <div className="font-semibold text-sm">{selectedTemplate.name}</div>
+                          <div className="flex gap-2">
+                            <Badge variant="secondary" className="text-[9px] py-0">{selectedTemplate.source}</Badge>
+                            <Badge variant="outline" className="text-[9px] py-0">{selectedTemplate.category}</Badge>
+                          </div>
+                        </div>
+                        
+                        <Separator />
+                        
+                        <div className="space-y-3">
+                          <div className="space-y-1.5">
+                            <Label className="text-[11px] font-bold text-muted-foreground uppercase">System Guidance</Label>
+                            <div className="rounded-lg bg-muted/40 p-3 text-[12px] leading-relaxed text-muted-foreground">
+                              {selectedTemplate.systemPrompt}
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-1.5">
+                            <Label className="text-[11px] font-bold text-muted-foreground uppercase">Context Prefix</Label>
+                            <div className="rounded-lg bg-muted/40 p-3 text-[12px] leading-relaxed text-muted-foreground italic">
+                              {selectedTemplate.promptPrefix || "No context prefix configured."}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <Badge variant="outline">{selectedTemplate.category}</Badge>
+                    </>
+                  ) : (
+                    <div className="flex h-full flex-col items-center justify-center py-12 text-center">
+                      <p className="text-sm text-muted-foreground italic">No template selected.</p>
                     </div>
-                    <div className="space-y-2 text-sm">
-                      <div>
-                        <div className="font-medium">System Prompt</div>
-                        <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{selectedTemplate.systemPrompt}</p>
-                      </div>
-                      <div>
-                        <div className="font-medium">Prompt Prefix</div>
-                        <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{selectedTemplate.promptPrefix || "None"}</p>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No template selected.</p>
-                )}
-              </CardContent>
+                  )}
+                </CardContent>
+              </ScrollArea>
+              <div className="shrink-0 border-t p-4 text-[11px] text-muted-foreground bg-muted/20">
+                You can manage these prompts in the Prompt Management tab.
+              </div>
             </Card>
           </div>
         </TabsContent>

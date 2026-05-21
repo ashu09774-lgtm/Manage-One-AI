@@ -93,7 +93,7 @@ test("database testing: schema, seeds, backups, and test database scripts are pr
 
   assert.ok((schema.match(/FOREIGN KEY/g) ?? []).length >= 25)
   assert.match(seed, /asha@example\.com/)
-  assert.match(seed, /TaskFlow|TaskFlowseed0001/)
+  assert.match(seed, /taskflowseed0001/)
   assert.equal(exists("database", "backup.ps1"), true)
   assert.equal(exists("database", "restore.ps1"), true)
   assert.equal(exists("database", "test-db.ps1"), true)
@@ -127,7 +127,7 @@ test("ai module testing: assistant, prompts, provider fallback, and multi-agent 
   assert.match(assistantRoute, /generateAssistantReply/)
   assert.match(promptsRoute, /getPromptTemplates/)
   assert.match(ai, /GEMINI_API_KEY/)
-  assert.match(ai, /taskflow-local/)
+  assert.match(ai, /manage-one-local/)
   assert.match(ai, /fallbackTaskGeneration/)
   assert.match(multiAgent, /planner/)
   assert.match(multiAgent, /scheduler/)
@@ -141,6 +141,7 @@ test("end-to-end flow testing: public, auth, and dashboard pages are connected",
   const sidebar = await read("components", "dashboard", "sidebar.tsx")
   const header = await read("components", "dashboard", "header.tsx")
   const dashboardLayout = await read("app", "(dashboard)", "layout.tsx")
+  const userProvider = await read("components", "user-provider.tsx")
 
   assert.match(landing, /<LandingHeader/)
   assert.match(landing, /<HeroSection/)
@@ -148,7 +149,7 @@ test("end-to-end flow testing: public, auth, and dashboard pages are connected",
   assert.match(landing, /<PricingSection/)
   assert.match(header, /\/dashboard\/search/)
   assert.match(header, /\/dashboard\/settings/)
-  assert.match(dashboardLayout, /\/api\/auth\/me/)
+  assert.match(userProvider, /\/api\/auth\/me/)
 
   const dashboardPages = [
     "dashboard",

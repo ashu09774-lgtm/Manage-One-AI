@@ -6,7 +6,25 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Crown, Mail, Plus, Search, Shield, User } from "lucide-react"
+import { Crown, Mail, Plus, Search, Shield, User, Loader2 } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
+import { toast } from "sonner"
 
 interface UserData {
   id: string
@@ -21,6 +39,11 @@ interface Member {
   tasks: number
 }
 
+interface Workspace {
+  id: number
+  name: string
+}
+
 const roleIcons = {
   owner: Crown,
   admin: Crown,
@@ -31,8 +54,16 @@ const roleIcons = {
 export default function TeamPage() {
   const [user, setUser] = useState<UserData | null>(null)
   const [members, setMembers] = useState<Member[]>([])
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [isLoading, setIsLoading] = useState(true)
+  const [isInviteOpen, setIsInviteOpen] = useState(false)
+  const [isInviting, setIsInviting] = useState(false)
+  const [inviteForm, setInviteForm] = useState({
+    email: "",
+    workspaceId: "",
+    role: "member",
+  })
 
   useEffect(() => {
     const storedUser = localStorage.getItem("manageone_user")
@@ -50,8 +81,58 @@ export default function TeamPage() {
       setIsLoading(false)
     }
 
-    loadTeam()
+    async function loadWorkspaces() {
+      const response = await fetch(`/api/workspaces?userId=${user!.id}`)
+      const data = await response.json()
+      if (response.ok) {
+        setWorkspaces(data.workspaces)
+        if (data.workspaces.length > 0) {
+          setInviteForm(prev => ({ ...prev, workspaceId: String(data.workspaces[0].id) }))
+        }
+      }
+    }
+
+    void loadTeam()
+    void loadWorkspaces()
   }, [user])
+
+  async function handleInvite() {
+    if (!user?.id || !inviteForm.email || !inviteForm.workspaceId) return
+
+    setIsInviting(true)
+    try {
+      const response = await fetch(`/api/workspaces/${inviteForm.workspaceId}/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          email: inviteForm.email,
+          role: inviteForm.role,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        toast.error(data.error ?? "Failed to invite member")
+        return
+      }
+
+      toast.success("Invitation sent successfully!")
+      setIsInviteOpen(false)
+      setInviteForm({ email: "", workspaceId: workspaces[0]?.id ? String(workspaces[0].id) : "", role: "member" })
+      
+      // Refresh team list
+      const teamResponse = await fetch(`/api/team?userId=${user.id}`)
+      const teamData = await teamResponse.json()
+      if (teamResponse.ok) setMembers(teamData.members)
+      
+    } catch (error) {
+      toast.error("An error occurred during invitation")
+    } finally {
+      setIsInviting(false)
+    }
+  }
 
   const filteredMembers = members.filter((member) =>
     `${member.name} ${member.email}`.toLowerCase().includes(searchQuery.toLowerCase())
@@ -64,7 +145,77 @@ export default function TeamPage() {
           <h1 className="text-2xl font-bold tracking-tight">Team</h1>
           <p className="text-muted-foreground">Manage your team members and permissions</p>
         </div>
-        <Button className="gap-2" disabled><Plus className="h-4 w-4" />Invite Member</Button>
+        <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" />
+              Invite Member
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Invite Team Member</DialogTitle>
+              <DialogDescription>
+                Send an invitation to join your workspace. They will receive an email to accept.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  placeholder="name@example.com"
+                  type="email"
+                  value={inviteForm.email}
+                  onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="workspace">Workspace</Label>
+                <Select
+                  value={inviteForm.workspaceId}
+                  onValueChange={(value) => setInviteForm({ ...inviteForm, workspaceId: value })}
+                >
+                  <SelectTrigger id="workspace">
+                    <SelectValue placeholder="Select workspace" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {workspaces.map((ws) => (
+                      <SelectItem key={ws.id} value={String(ws.id)}>
+                        {ws.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="role">Role</Label>
+                <Select
+                  value={inviteForm.role}
+                  onValueChange={(value) => setInviteForm({ ...inviteForm, role: value })}
+                >
+                  <SelectTrigger id="role">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="member">Member</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="viewer">Viewer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsInviteOpen(false)} disabled={isInviting}>
+                Cancel
+              </Button>
+              <Button onClick={handleInvite} disabled={isInviting || !inviteForm.email || !inviteForm.workspaceId}>
+                {isInviting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                Invite Member
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="relative">

@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server"
-import { badRequest, getUserId, serverError } from "@/lib/api-utils"
+import { badRequest, getUserId, serverError, getAuthenticatedUserId } from "@/lib/api-utils"
 import { createAgentRun, executeAgentRun, getAgentCatalog, getAgentRuns } from "@/lib/multi-agent"
 
 export async function GET(request: Request) {
-  const userId = getUserId(request)
+  const userId = await getAuthenticatedUserId(request)
   const { searchParams } = new URL(request.url)
   const workspaceId = Number(searchParams.get("workspaceId"))
   const parsedWorkspaceId = Number.isInteger(workspaceId) && workspaceId > 0 ? workspaceId : null
@@ -27,11 +27,11 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { userId, workspaceId, goal } = await request.json()
-    const parsedUserId = Number(userId)
+    const parsedUserId = Number(userId) || (await getAuthenticatedUserId(request))
     const parsedWorkspaceId = Number.isInteger(Number(workspaceId)) && Number(workspaceId) > 0 ? Number(workspaceId) : null
     const runGoal = String(goal ?? "").trim()
 
-    if (!Number.isInteger(parsedUserId) || parsedUserId < 1) {
+    if (!parsedUserId || parsedUserId < 1) {
       return badRequest("Missing user id")
     }
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import type { ResultSetHeader, RowDataPacket } from "mysql2"
-import { badRequest, getUserId, serverError } from "@/lib/api-utils"
+import { badRequest, getUserId, serverError, getAuthenticatedUserId } from "@/lib/api-utils"
 import { generateAssistantReply, getPromptTemplates, getUsageSummary, getTemplateById } from "@/lib/ai"
 import { db } from "@/lib/db"
 import { rateLimiter } from "@/lib/rate-limit"
@@ -24,7 +24,7 @@ async function getConversationId(userId: number) {
 }
 
 export async function GET(request: Request) {
-  const userId = getUserId(request)
+  const userId = await getAuthenticatedUserId(request)
   const { searchParams } = new URL(request.url)
   const workspaceIdParam = Number(searchParams.get("workspaceId"))
 
@@ -86,11 +86,11 @@ export async function POST(request: Request) {
     }
 
     const { userId, content, templateId, workspaceId } = await request.json()
-    const parsedUserId = Number(userId)
+    const parsedUserId = Number(userId) || (await getAuthenticatedUserId(request))
     const message = String(content ?? "").trim()
     const parsedWorkspaceId = Number.isInteger(Number(workspaceId)) && Number(workspaceId) > 0 ? Number(workspaceId) : null
 
-    if (!Number.isInteger(parsedUserId) || parsedUserId < 1) {
+    if (!parsedUserId || parsedUserId < 1) {
       return badRequest("Missing user id")
     }
 

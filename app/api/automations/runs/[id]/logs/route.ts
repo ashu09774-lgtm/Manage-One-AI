@@ -5,13 +5,14 @@ import type { RowDataPacket } from "mysql2"
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const userId = getUserId(request)
     if (!userId) return badRequest("Missing user id")
 
-    const runId = Number(params.id)
+    const { id } = await params
+    const runId = Number(id)
     if (isNaN(runId)) return badRequest("Invalid run id")
 
     // Verify access via automation membership

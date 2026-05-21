@@ -71,14 +71,13 @@ export function DashboardSidebar({ collapsed, setCollapsed, mobileOpen = false, 
       <aside
         aria-label="Dashboard navigation"
         className={cn(
-          "fixed left-0 top-0 z-50 flex h-screen w-64 flex-col border-r border-border/50 transition-transform duration-300 md:z-40 md:transition-all",
-          "glass dark:glass",
+          "fixed left-0 top-0 z-50 flex h-screen w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-sm transition-transform duration-300 md:z-40 md:transition-all",
           mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
           collapsed ? "md:w-16" : "md:w-64"
         )}
       >
       {/* Header */}
-      <div className="flex h-16 items-center justify-between border-b border-border px-4">
+      <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
         <Link href="/dashboard" className="flex items-center gap-2" onClick={closeMobile}>
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
             <Zap className="h-5 w-5 text-primary-foreground" />
@@ -138,7 +137,7 @@ export function DashboardSidebar({ collapsed, setCollapsed, mobileOpen = false, 
         </nav>
 
         {/* Secondary Navigation */}
-        <div className="mt-6 border-t border-border pt-6">
+        <div className="mt-6 border-t border-sidebar-border pt-6">
           <nav className="space-y-1">
             {secondaryNav.map((item) => {
               const isActive = pathname === item.href
@@ -167,7 +166,7 @@ export function DashboardSidebar({ collapsed, setCollapsed, mobileOpen = false, 
       </ScrollArea>
 
       {/* Footer */}
-      <div className="border-t border-border p-3">
+      <div className="border-t border-sidebar-border p-3">
         <div className={cn("flex items-center gap-2", collapsed && "md:justify-center")}>
           <ThemeToggle />
           {!collapsed && (

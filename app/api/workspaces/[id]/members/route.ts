@@ -178,12 +178,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const [[inviter]] = await db.execute<RowDataPacket[]>("SELECT name FROM users WHERE id = ? LIMIT 1", [actorId])
     const [[workspace]] = await db.execute<RowDataPacket[]>("SELECT name FROM workspaces WHERE id = ? LIMIT 1", [workspaceId])
 
-    await sendTeamInvitationEmail(
+    // Send invitation email asynchronously to prevent blocking the response
+    sendTeamInvitationEmail(
       invitedEmail,
       inviter?.name ?? "A team member",
       workspace?.name ?? "a workspace",
       token
-    )
+    ).catch((err) => console.error("Failed to send invitation email:", err))
 
     return NextResponse.json({
       invitation: {

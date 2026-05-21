@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server"
-import { badRequest, getUserId, serverError } from "@/lib/api-utils"
+import { badRequest, getUserId, serverError, getAuthenticatedUserId } from "@/lib/api-utils"
 import { getAgentRunDetail } from "@/lib/multi-agent"
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const userId = getUserId(request)
+  const userId = await getAuthenticatedUserId(request)
   const { id } = await params
   const runId = Number(id)
 

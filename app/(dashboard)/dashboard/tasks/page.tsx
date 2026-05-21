@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import Link from "next/link"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -184,8 +184,12 @@ export default function TasksPage() {
   const [showMentionDropdown, setShowMentionDropdown] = useState(false)
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("manageone_user")
-    if (storedUser) setUser(JSON.parse(storedUser))
+    try {
+      const storedUser = localStorage.getItem("manageone_user")
+      if (storedUser) setUser(JSON.parse(storedUser))
+    } catch (err) {
+      console.error("Failed to parse user from localStorage", err)
+    }
   }, [])
 
   useEffect(() => {
@@ -202,29 +206,29 @@ export default function TasksPage() {
     if (!projectsByWorkspace[workspaceId]) void loadProjects(workspaceId, user.id)
   }, [newTask.workspaceId, user, labelsByWorkspace, membersByWorkspace, projectsByWorkspace])
 
-  const filteredTasks = tasks.filter((task) => {
+  const filteredTasks = useMemo(() => (tasks || []).filter((task) => {
     const matchesSearch =
-      task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.workspace.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.labels.some((label) => label.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      (task.title || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (task.workspace || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (task.labels || []).some((label) => (label.name || "").toLowerCase().includes(searchQuery.toLowerCase()))
     const matchesStatus = statusFilter === "all" || task.status === statusFilter
     const matchesPriority = priorityFilter === "all" || task.priority === priorityFilter
     return matchesSearch && matchesStatus && matchesPriority
-  })
+  }), [tasks, searchQuery, statusFilter, priorityFilter])
 
-  const groupedTasks = columns.map((column) => ({
+  const groupedTasks = useMemo(() => columns.map((column) => ({
     ...column,
     tasks: filteredTasks.filter((task) => task.status === column.id),
-  }))
+  })), [filteredTasks])
 
-  const stats = {
-    total: tasks.length,
-    completed: tasks.filter((task) => task.status === "done").length,
-    inProgress: tasks.filter((task) => task.status === "in-progress").length,
-    overdue: tasks.filter((task) => task.dueDate && task.status !== "done" && new Date(task.dueDate) < new Date()).length,
-  }
+  const stats = useMemo(() => ({
+    total: (tasks || []).length,
+    completed: (tasks || []).filter((task) => task.status === "done").length,
+    inProgress: (tasks || []).filter((task) => task.status === "in-progress").length,
+    overdue: (tasks || []).filter((task) => task.dueDate && task.status !== "done" && new Date(task.dueDate) < new Date()).length,
+  }), [tasks])
 
-  const calendarGroups = groupByDueDate(filteredTasks)
+  const calendarGroups = useMemo(() => groupByDueDate(filteredTasks), [filteredTasks])
 
   async function loadData(userId: string) {
     setIsLoading(true)
@@ -238,8 +242,8 @@ export default function TasksPage() {
       const workspacesData = await workspacesResponse.json()
       if (!tasksResponse.ok) throw new Error(tasksData.error)
       if (!workspacesResponse.ok) throw new Error(workspacesData.error)
-      setTasks(tasksData.tasks)
-      setWorkspaces(workspacesData.workspaces)
+      setTasks(tasksData.tasks || [])
+      setWorkspaces(workspacesData.workspaces || [])
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Could not load tasks")
     } finally {
@@ -249,30 +253,39 @@ export default function TasksPage() {
 
   async function loadLabels(workspaceId: number, userId: string) {
     const response = await fetch(`/api/labels?userId=${userId}&workspaceId=${workspaceId}`)
+    if (!response.ok) {
+      setLabelsByWorkspace((current) => ({ ...current, [workspaceId]: [] }))
+      return
+    }
     const data = await response.json()
-    if (!response.ok) return
-    setLabelsByWorkspace((current) => ({ ...current, [workspaceId]: data.labels }))
+    setLabelsByWorkspace((current) => ({ ...current, [workspaceId]: data.labels || [] }))
   }
 
   async function loadMembers(workspaceId: number, userId: string) {
     const response = await fetch(`/api/workspaces/${workspaceId}/members?userId=${userId}`)
+    if (!response.ok) {
+      setMembersByWorkspace((current) => ({ ...current, [workspaceId]: [] }))
+      return
+    }
     const data = await response.json()
-    if (!response.ok) return
-    setMembersByWorkspace((current) => ({ ...current, [workspaceId]: data.members }))
+    setMembersByWorkspace((current) => ({ ...current, [workspaceId]: data.members || [] }))
   }
 
   async function loadProjects(workspaceId: number, userId: string) {
     const response = await fetch(`/api/workspaces/${workspaceId}/projects?userId=${userId}`)
+    if (!response.ok) {
+      setProjectsByWorkspace((current) => ({ ...current, [workspaceId]: [] }))
+      return
+    }
     const data = await response.json()
-    if (!response.ok) return
-    setProjectsByWorkspace((current) => ({ ...current, [workspaceId]: data.projects }))
+    setProjectsByWorkspace((current) => ({ ...current, [workspaceId]: data.projects || [] }))
   }
 
   async function loadTemplates(userId: string) {
     try {
       const response = await fetch(`/api/tasks/templates?userId=${userId}`)
       const data = await response.json()
-      if (response.ok) setTemplates(data.templates)
+      if (response.ok) setTemplates(data.templates || [])
     } catch (err) {
       console.error("Failed to load templates", err)
     }
@@ -409,7 +422,7 @@ export default function TasksPage() {
     const assigneeName = newTask.assigneeId === "me"
       ? "You"
       : members.find((member) => member.id === Number(newTask.assigneeId))?.name ?? "Unassigned"
-    setTasks((current) => [{ ...data.task, workspace: workspace?.name ?? "Workspace", assignee: assigneeName, labels }, ...current])
+    setTasks((current) => [{ ...(data.task || {}), workspace: workspace?.name ?? "Workspace", assignee: assigneeName, labels }, ...current])
     setNewTask({ title: "", description: "", workspaceId: "", projectId: "none", assigneeId: "me", priority: "medium", dueDate: "", status: "todo", labelIds: [] })
     setDialogOpen(false)
   }
@@ -918,9 +931,13 @@ export default function TasksPage() {
                           </div>
                         </button>
                         <div className="flex items-center gap-3">
-                          <Badge className={statusColors[task.status]}>{task.status.replace("-", " ")}</Badge>
+                          <Badge className={statusColors[task.status] || "bg-muted text-muted-foreground"}>{(task.status || "").replace("-", " ")}</Badge>
                           <Badge className={priorityColors[task.priority]}>{task.priority}</Badge>
-                          <Avatar className="h-8 w-8"><AvatarFallback className="text-xs">{task.assignee?.split(" ").map((part) => part[0]).join("") || "U"}</AvatarFallback></Avatar>
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="text-xs">
+                              {(task.assignee?.split(" ") ?? []).map((part) => part[0]).join("") || "U"}
+                            </AvatarFallback>
+                          </Avatar>
                         </div>
                       </div>
                     ))}
@@ -1013,7 +1030,7 @@ export default function TasksPage() {
                 </DropdownMenu>
               </div>
               <Field label="Time Tracking">
-                <TimeTracker taskId={selectedTask.id} userId={Number(user.id)} />
+                <TimeTracker taskId={selectedTask.id} userId={Number(user?.id || 0)} />
               </Field>
               <Field label="Description">
                 <RichTextEditor value={selectedTask.description ?? ""} onChange={(value) => setSelectedTask({ ...selectedTask, description: value })} />
@@ -1293,7 +1310,7 @@ export default function TasksPage() {
                       {selectedTask.dependencies.map(dep => (
                         <div key={dep.id} className="flex items-center justify-between rounded-md border border-border p-2">
                           <div className="flex items-center gap-2">
-                            <Badge className={statusColors[dep.status as keyof typeof statusColors] || "bg-muted text-muted-foreground"}>{dep.status.replace("-", " ")}</Badge>
+                            <Badge className={statusColors[dep.status as keyof typeof statusColors] || "bg-muted text-muted-foreground"}>{(dep.status || "").replace("-", " ")}</Badge>
                             <span className="text-sm font-medium">{dep.title}</span>
                           </div>
                           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeDependency(dep.id)}>
@@ -1391,8 +1408,8 @@ function StatCard({ title, value, tone }: { title: string; value: number; tone?:
   )
 }
 
-function groupByDueDate(tasks: Task[]) {
-  const datedTasks = tasks.filter((task) => task.dueDate)
+function groupByDueDate(tasks: Task[] = []) {
+  const datedTasks = (tasks || []).filter((task) => task.dueDate)
   const groups = new Map<string, Task[]>()
 
   for (const task of datedTasks) {
@@ -1401,15 +1418,16 @@ function groupByDueDate(tasks: Task[]) {
   }
 
   return [...groups.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
+    .sort(([left], [right]) => (left || "").localeCompare(right || ""))
     .map(([date, groupedTasks]) => ({
       date,
-      label: new Date(date).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }),
+      label: formatDateTime(date).split(",")[0], // Fallback to formatDateTime for consistency
       tasks: groupedTasks,
     }))
 }
 
-function formatDateTime(value: string) {
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return ""
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) {
     return value

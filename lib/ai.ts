@@ -359,7 +359,23 @@ export async function generateAssistantStream(input: {
   const model = process.env.GEMINI_MODEL ?? "gemini-2.0-flash"
 
   if (!apiKey) {
-    throw new Error("Gemini API key not configured for streaming")
+    const fallback = generateFallbackReply(input.template, context, prompt)
+    const encoder = new TextEncoder()
+    return new ReadableStream({
+      async start(controller) {
+        // SSE format simulator: data: {"candidates":[{"content":{"parts":[{"text":"..."}]}}]}\n\n
+        const parts = fallback.split(" ")
+        for (const part of parts) {
+          const text = part + " "
+          const json = JSON.stringify({
+            candidates: [{ content: { parts: [{ text }] } }]
+          })
+          controller.enqueue(encoder.encode(`data: ${json}\n\n`))
+          await new Promise(resolve => setTimeout(resolve, 50))
+        }
+        controller.close()
+      }
+    })
   }
 
   const response = await fetch(

@@ -75,6 +75,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML())
     },
+    immediatelyRender: false,
     editorProps: {
       attributes: {
         class:

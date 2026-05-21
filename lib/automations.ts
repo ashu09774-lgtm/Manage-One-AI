@@ -268,7 +268,13 @@ export async function runAutomation(userId: number, automationId: number) {
     await db.execute(
       `INSERT INTO activity_events (workspace_id, actor_id, action, entity_type, entity_id, metadata)
       VALUES (?, ?, 'executed', 'automation', ?, JSON_OBJECT('name', ?, 'items', ?))`,
-      [automation.workspaceId, userId, automationId, automation.name, output.affectedCount ?? 0]
+      [
+        automation.workspaceId,
+        userId,
+        automationId,
+        automation.name,
+        "affectedCount" in output ? output.affectedCount : 0,
+      ]
     )
 
     return {
@@ -426,7 +432,7 @@ async function executeWorkflowGraph(automation: ReturnType<typeof mapAutomationR
   const { nodes, edges } = graph
 
   // Find the trigger node
-  const triggerNode = nodes.find(n => n.type === "trigger")
+  const triggerNode = nodes.find((n: { type?: string }) => n.type === "trigger")
   if (!triggerNode) {
     throw new Error("Workflow must have a trigger node")
   }
@@ -444,7 +450,7 @@ async function executeWorkflowGraph(automation: ReturnType<typeof mapAutomationR
     if (visited.has(nodeId)) continue // Prevent infinite loops
     visited.add(nodeId)
     
-    const node = nodes.find(n => n.id === nodeId)
+    const node = nodes.find((n: { id?: string }) => n.id === nodeId)
     if (!node) continue
 
     let outputPayload = { ...payload }
@@ -499,7 +505,7 @@ async function executeWorkflowGraph(automation: ReturnType<typeof mapAutomationR
       nodesExecuted++
       
       // Enqueue next nodes based on edges
-      const outgoingEdges = edges.filter(e => e.source === nodeId)
+      const outgoingEdges = edges.filter((e: { source?: string }) => e.source === nodeId)
       for (const edge of outgoingEdges) {
         // If it's a condition node, we might want to only follow the 'true' or 'false' handle
         if (node.type === "condition") {

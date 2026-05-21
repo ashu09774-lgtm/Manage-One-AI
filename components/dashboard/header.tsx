@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { ThemeToggle } from "@/components/theme-toggle"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -133,6 +134,8 @@ export function DashboardHeader({ onMenuClick }: { onMenuClick?: () => void }) {
       </form>
       {/* Actions */}
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <ThemeToggle />
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative" aria-label="Open notifications">

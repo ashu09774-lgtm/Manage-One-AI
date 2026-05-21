@@ -9,6 +9,13 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/dashboard",
 }))
 
+vi.mock("next-themes", () => ({
+  useTheme: () => ({
+    theme: "light",
+    setTheme: vi.fn(),
+  }),
+}))
+
 // Mock fetch for workspaces
 global.fetch = vi.fn().mockImplementation((url) => {
   if (url.includes("/api/workspaces")) {
@@ -36,7 +43,7 @@ vi.mock("@/components/user-provider", () => ({
 }))
 
 describe("DashboardSidebar", () => {
-  it("renders the sidebar with correct navigation links", async () => {
+  it("renders the sidebar with correct navigation links", () => {
     render(
       <UserProvider>
         <DashboardSidebar
@@ -49,7 +56,7 @@ describe("DashboardSidebar", () => {
     )
 
     // Check branding
-    expect(screen.getByText("TaskFlow AI")).toBeInTheDocument()
+    expect(screen.getByText("Manage One AI")).toBeInTheDocument()
 
     // Check main navigation items
     expect(screen.getByText("Dashboard")).toBeInTheDocument()
@@ -74,6 +81,6 @@ describe("DashboardSidebar", () => {
     // When collapsed, the text shouldn't be visible (it's hidden via CSS classes or conditional rendering)
     // Actually, in the component, text might be hidden using CSS opacity or conditional render.
     // Let's just check that it renders without crashing in collapsed mode.
-    expect(screen.getAllByRole("navigation").length).toBeGreaterThan(0)
+    expect(screen.getByLabelText("Dashboard navigation")).toBeInTheDocument()
   })
 })
