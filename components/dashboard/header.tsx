@@ -115,30 +115,30 @@ export function DashboardHeader({ onMenuClick }: { onMenuClick?: () => void }) {
     : "U"
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-xl sm:px-6">
-      <Button variant="ghost" size="icon" className="shrink-0 md:hidden" onClick={onMenuClick} aria-label="Open navigation">
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-border bg-background/95 px-3 backdrop-blur sm:px-4">
+      <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 lg:hidden" onClick={onMenuClick} aria-label="Open navigation">
         <Menu className="h-5 w-5" />
       </Button>
 
 
       {/* Search */}
-      <form className="relative min-w-0 flex-1 sm:max-w-md group" onSubmit={handleSearch}>
+      <form className="group relative min-w-0 flex-1 sm:max-w-md lg:max-w-xl" onSubmit={handleSearch}>
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
         <Input
           type="search"
           placeholder="Search tasks, projects, notes..."
-          className="w-full pl-10 rounded-xl border-border/40 bg-background/50 backdrop-blur-md focus-visible:ring-primary/30 transition-all duration-300"
+          className="h-10 w-full rounded-lg border-border bg-background pl-9 shadow-none transition-all duration-200 focus-visible:ring-primary/20"
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
         />
       </form>
       {/* Actions */}
-      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+      <div className="flex shrink-0 items-center gap-0.5 sm:gap-2">
         <ThemeToggle />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative" aria-label="Open notifications">
+            <Button variant="ghost" size="icon" className="relative h-9 w-9" aria-label="Open notifications">
               <Bell className="h-5 w-5" />
               {unreadCount > 0 && (
                 <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] text-primary-foreground">
@@ -182,8 +182,8 @@ export function DashboardHeader({ onMenuClick }: { onMenuClick?: () => void }) {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-9 w-9 rounded-full" aria-label="Open user menu">
-              <Avatar className="h-9 w-9">
+            <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0" aria-label="Open user menu">
+              <Avatar className="h-8 w-8">
                 <AvatarFallback className="bg-primary/10 text-primary">
                   {initials}
                 </AvatarFallback>

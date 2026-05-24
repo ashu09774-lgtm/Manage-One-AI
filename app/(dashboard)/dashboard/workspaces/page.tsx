@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { ArrowRight, Calendar, FolderKanban, Plus, Search } from "lucide-react"
+import { ArrowRight, Calendar, FolderKanban, Plus, Search, Trash2 } from "lucide-react"
+import { DeleteWorkspaceDialog } from "@/components/workspace/delete-workspace-dialog"
 
 interface Workspace {
   id: number
@@ -36,6 +37,7 @@ export default function WorkspacesPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState("")
+  const [deleteTarget, setDeleteTarget] = useState<Workspace | null>(null)
 
   useEffect(() => {
     const storedUser = localStorage.getItem("manageone_user")
@@ -154,10 +156,22 @@ export default function WorkspacesPage() {
                     <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${workspace.color}`}>
                       <FolderKanban className="h-5 w-5 text-white" />
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <CardTitle className="truncate text-lg">{workspace.name}</CardTitle>
                       <CardDescription className="line-clamp-1">{workspace.description || "No description"}</CardDescription>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        setDeleteTarget(workspace)
+                      }}
+                      title="Delete workspace"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -192,6 +206,21 @@ export default function WorkspacesPage() {
             )
           })}
         </div>
+      )}
+
+      {deleteTarget && (
+        <DeleteWorkspaceDialog
+          open={!!deleteTarget}
+          onOpenChange={(open) => {
+            if (!open) setDeleteTarget(null)
+          }}
+          workspaceId={deleteTarget.id}
+          workspaceName={deleteTarget.name}
+          onDeleted={() => {
+            setWorkspaces((current) => current.filter((w) => w.id !== deleteTarget.id))
+            setDeleteTarget(null)
+          }}
+        />
       )}
     </div>
   )

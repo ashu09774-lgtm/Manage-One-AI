@@ -136,3 +136,48 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return serverError("Could not save workspace settings")
   }
 }
+
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const userId = getUserId(request)
+  const { id } = await params
+  const workspaceId = Number(id)
+
+  if (!userId) {
+    return badRequest("Missing user id")
+  }
+
+  if (!Number.isInteger(workspaceId) || workspaceId < 1) {
+    return badRequest("Invalid workspace id")
+  }
+
+  try {
+    // Check if user is owner of the workspace
+    const [[membership]] = await db.execute<(RowDataPacket & { role: string })[]>(
+      "SELECT role FROM workspace_members WHERE workspace_id = ? AND user_id = ? LIMIT 1",
+      [workspaceId, userId]
+    )
+
+    if (!membership) {
+      return NextResponse.json({ error: "Workspace not found" }, { status: 404 })
+    }
+
+    if (String(membership.role) !== "owner") {
+      return NextResponse.json({ error: "Only workspace owners can delete workspaces" }, { status: 403 })
+    }
+
+    // Get workspace name for activity log
+    const [[workspace]] = await db.execute<RowDataPacket[]>(
+      "SELECT name FROM workspaces WHERE id = ? LIMIT 1",
+      [workspaceId]
+    )
+
+    // Delete all related data (cascade will handle most, but explicit for clarity)
+    await db.execute("DELETE FROM activity_events WHERE workspace_id = ?", [workspaceId])
+    await db.execute("DELETE FROM workspaces WHERE id = ?", [workspaceId])
+
+    return NextResponse.json({ ok: true, message: "Workspace deleted successfully" })
+  } catch (error) {
+    console.error("Delete workspace failed:", error)
+    return serverError("Could not delete workspace")
+  }
+}

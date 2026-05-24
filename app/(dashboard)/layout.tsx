@@ -33,11 +33,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background">
-      {/* Premium background orbs */}
-      <div className="gradient-orb gradient-orb-1 top-[-10%] left-[-10%] animate-pulse-glow" />
-      <div className="gradient-orb gradient-orb-2 bottom-[-10%] right-[-10%] animate-float-slow" />
-      
+    <div className="relative min-h-screen bg-background">
       <a href="#dashboard-content" className="skip-link">Skip to content</a>
       <DashboardSidebar
         collapsed={collapsed}
@@ -47,12 +43,12 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       />
       <div
         className={cn(
-          "relative z-10 flex min-w-0 flex-col transition-all duration-300",
-          collapsed ? "md:ml-16" : "md:ml-64"
+          "relative z-10 flex min-h-screen min-w-0 flex-col transition-all duration-300",
+          collapsed ? "lg:ml-16" : "lg:ml-60"
         )}
       >
         <DashboardHeader onMenuClick={() => setMobileSidebarOpen(true)} />
-        <main id="dashboard-content" className="flex-1 p-4 pb-20 sm:p-6 sm:pb-6">{children}</main>
+        <main id="dashboard-content" className="mx-auto w-full max-w-[1600px] flex-1 p-3 pb-32 sm:p-4 sm:pb-32 lg:p-5 lg:pb-5">{children}</main>
       </div>
       <MobileNav />
     </div>

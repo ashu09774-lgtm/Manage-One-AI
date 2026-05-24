@@ -44,7 +44,7 @@ python -m uvicorn app.main:app --reload --port 8000
 - Session auth uses a signed HTTP-only cookie.
 - Forgot password works with reset tokens stored in MySQL.
 - Google sign-in is implemented and becomes active after setting `NEXT_PUBLIC_GOOGLE_CLIENT_ID`.
-- Seeded demo login, after running `.\database\migrate.ps1 -Seed`: `asha@example.com` / `Manage One123!`.
+- Seeded demo login, after running `.\database\migrate.ps1 -Seed`: `asha@example.com` / `TaskFlow123!`.
 
 ## Database Notes
 

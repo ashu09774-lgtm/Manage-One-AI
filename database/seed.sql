@@ -2,13 +2,14 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 INSERT INTO users (name, email, avatar_url, status, password_hash)
 VALUES
-  ('Asha Verma', 'asha@example.com', '/placeholder-user.jpg', 'online', 'taskflowseed0001:883c129ebf6bf0487feff46740b5b6c212100b3633dd5cb3fc682bb57be1b9b7f76bede52bd65147ca3c53af49da69616ac8b6d17b0bebf458899b18ccf3e6f1'),
-  ('Rohan Mehta', 'rohan@example.com', '/placeholder-user.jpg', 'away', 'taskflowseed0001:883c129ebf6bf0487feff46740b5b6c212100b3633dd5cb3fc682bb57be1b9b7f76bede52bd65147ca3c53af49da69616ac8b6d17b0bebf458899b18ccf3e6f1'),
-  ('Mira Shah', 'mira@example.com', '/placeholder-user.jpg', 'offline', 'taskflowseed0001:883c129ebf6bf0487feff46740b5b6c212100b3633dd5cb3fc682bb57be1b9b7f76bede52bd65147ca3c53af49da69616ac8b6d17b0bebf458899b18ccf3e6f1')
+  ('Asha Verma', 'asha@example.com', '/placeholder-user.jpg', 'online', 'taskflowseed0001:733407c27baee3b4a26786dfb75a458c393d1e46072256a12a6f28932e57821cafa6f6f01e446a2412df2e930266fb455cf657740b1510e223ab728415978fff'),
+  ('Rohan Mehta', 'rohan@example.com', '/placeholder-user.jpg', 'away', 'taskflowseed0001:733407c27baee3b4a26786dfb75a458c393d1e46072256a12a6f28932e57821cafa6f6f01e446a2412df2e930266fb455cf657740b1510e223ab728415978fff'),
+  ('Mira Shah', 'mira@example.com', '/placeholder-user.jpg', 'offline', 'taskflowseed0001:733407c27baee3b4a26786dfb75a458c393d1e46072256a12a6f28932e57821cafa6f6f01e446a2412df2e930266fb455cf657740b1510e223ab728415978fff')
 ON DUPLICATE KEY UPDATE
   name = VALUES(name),
   avatar_url = VALUES(avatar_url),
-  status = VALUES(status);
+  status = VALUES(status),
+  password_hash = VALUES(password_hash);
 
 INSERT IGNORE INTO user_settings (user_id)
 SELECT id FROM users WHERE email IN ('asha@example.com', 'rohan@example.com', 'mira@example.com');

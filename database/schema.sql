@@ -105,6 +105,31 @@ CREATE TABLE IF NOT EXISTS team_members (
     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS team_invitations (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  team_id INT NOT NULL,
+  email VARCHAR(190) NOT NULL,
+  token VARCHAR(128) NOT NULL UNIQUE,
+  role ENUM('lead', 'member') NOT NULL DEFAULT 'member',
+  invited_by INT NULL,
+  accepted_by INT NULL,
+  accepted_at TIMESTAMP NULL,
+  expires_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_team_invitations_team_id (team_id),
+  INDEX idx_team_invitations_email (email),
+  INDEX idx_team_invitations_token (token),
+  CONSTRAINT fk_team_invitations_team
+    FOREIGN KEY (team_id) REFERENCES teams(id)
+    ON DELETE CASCADE,
+  CONSTRAINT fk_team_invitations_invited_by
+    FOREIGN KEY (invited_by) REFERENCES users(id)
+    ON DELETE SET NULL,
+  CONSTRAINT fk_team_invitations_accepted_by
+    FOREIGN KEY (accepted_by) REFERENCES users(id)
+    ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS projects (
   id INT AUTO_INCREMENT PRIMARY KEY,
   workspace_id INT NOT NULL,
@@ -521,6 +546,8 @@ CREATE TABLE IF NOT EXISTS automation_runs (
 
 -- Phase 2.1 Task Management Schema Additions
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS sort_order INT NOT NULL DEFAULT 0 AFTER completed_at;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS ai_generated BOOLEAN NOT NULL DEFAULT FALSE AFTER sort_order;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS ai_agent_run_id INT NULL AFTER ai_generated;
 
 CREATE TABLE IF NOT EXISTS task_dependencies (
   task_id INT NOT NULL,

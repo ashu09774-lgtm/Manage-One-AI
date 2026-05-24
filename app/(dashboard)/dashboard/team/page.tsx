@@ -139,7 +139,7 @@ export default function TeamPage() {
   )
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Team</h1>
@@ -147,7 +147,7 @@ export default function TeamPage() {
         </div>
         <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
+            <Button className="w-full gap-2 sm:w-auto">
               <Plus className="h-4 w-4" />
               Invite Member
             </Button>
@@ -223,39 +223,39 @@ export default function TeamPage() {
         <Input placeholder="Search team members..." className="pl-10" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Total Members</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{members.length}</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Online Now</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{members.filter((member) => member.status === "online").length}</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Active Tasks</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{members.reduce((total, member) => total + member.tasks, 0)}</div></CardContent></Card>
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <TeamStat title="Total Members" value={members.length} />
+        <TeamStat title="Online Now" value={members.filter((member) => member.status === "online").length} />
+        <TeamStat title="Active Tasks" value={members.reduce((total, member) => total + member.tasks, 0)} />
       </div>
 
       {isLoading ? (
-        <Card><CardContent className="p-6 text-muted-foreground">Loading team...</CardContent></Card>
+        <Card className="py-0"><CardContent className="p-4 text-muted-foreground">Loading team...</CardContent></Card>
       ) : filteredMembers.length === 0 ? (
-        <Card><CardContent className="p-6 text-muted-foreground">No team members found. Create a workspace to add yourself as the first member.</CardContent></Card>
+        <Card className="py-0"><CardContent className="p-4 text-muted-foreground">No team members found. Create a workspace to add yourself as the first member.</CardContent></Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {filteredMembers.map((member) => {
             const RoleIcon = roleIcons[member.role] || User
             return (
-              <Card key={member.id} className="transition-colors hover:bg-muted/50">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-4">
+              <Card key={member.id} className="py-0 transition-colors hover:bg-muted/40">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
                       <div className="relative">
                         <Avatar className="h-12 w-12">
                           <AvatarFallback className="bg-primary/10 text-primary">{member.name.split(" ").map((part) => part[0]).join("")}</AvatarFallback>
                         </Avatar>
                         <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-card ${member.status === "online" ? "bg-green-500" : member.status === "away" ? "bg-yellow-500" : "bg-muted-foreground"}`} />
                       </div>
-                      <div>
-                        <h3 className="font-semibold">{member.name}</h3>
-                        <p className="text-sm text-muted-foreground">{member.email}</p>
+                      <div className="min-w-0">
+                        <h3 className="truncate font-semibold">{member.name}</h3>
+                        <p className="truncate text-sm text-muted-foreground">{member.email}</p>
                       </div>
                     </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" disabled><Mail className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" disabled><Mail className="h-4 w-4" /></Button>
                   </div>
-                  <div className="mt-4 flex items-center justify-between">
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
                     <Badge variant="secondary" className="gap-1"><RoleIcon className="h-3 w-3" />{member.role}</Badge>
                     <span className="text-sm text-muted-foreground">{member.tasks} active tasks</span>
                   </div>
@@ -266,6 +266,19 @@ export default function TeamPage() {
         </div>
       )}
     </div>
+  )
+}
+
+function TeamStat({ title, value }: { title: string; value: number }) {
+  return (
+    <Card className="py-0 shadow-sm">
+      <CardHeader className="p-3 pb-1 sm:p-4 sm:pb-2">
+        <CardTitle className="text-xs font-medium leading-4 text-muted-foreground sm:text-sm">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+        <div className="text-xl font-bold sm:text-2xl">{value}</div>
+      </CardContent>
+    </Card>
   )
 }
 

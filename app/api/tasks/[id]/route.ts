@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import type { ResultSetHeader, RowDataPacket } from "mysql2"
 import { badRequest, serverError } from "@/lib/api-utils"
 import { db } from "@/lib/db"
+import { notifyAiGoalIfCompleted } from "@/lib/ai-task-orchestrator"
 import { createNotification } from "@/lib/notifications"
 
 type TaskCommentRow = RowDataPacket & {
@@ -286,6 +287,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         entityId: taskId,
         dedupeHours: 24,
       })
+    }
+    if (nextStatus === "done") {
+      await notifyAiGoalIfCompleted({ taskId, userId: actorId })
     }
     await db.execute(
       `INSERT INTO activity_events (workspace_id, task_id, actor_id, action, entity_type, entity_id, metadata)

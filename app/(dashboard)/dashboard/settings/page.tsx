@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Bell, FolderKanban, Palette, Save, Shield, Trash2, User, Users } from "lucide-react"
+import { DeleteWorkspaceDialog } from "@/components/workspace/delete-workspace-dialog"
 
 interface UserData {
   id?: string
@@ -61,6 +62,7 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
+  const [deleteWorkspaceOpen, setDeleteWorkspaceOpen] = useState(false)
   const { theme, setTheme } = useTheme()
 
   useEffect(() => {
@@ -338,6 +340,16 @@ export default function SettingsPage() {
                 </div>
               </div>
               <Button onClick={saveWorkspaceSettings} disabled={isSaving || !canManageWorkspace}><Save className="h-4 w-4" />Save Workspace</Button>
+              {workspaceRole === "owner" && (
+                <Button
+                  variant="destructive"
+                  onClick={() => setDeleteWorkspaceOpen(true)}
+                  className="w-full"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete Workspace
+                </Button>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -446,6 +458,15 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {selectedWorkspaceId && (
+        <DeleteWorkspaceDialog
+          open={deleteWorkspaceOpen}
+          onOpenChange={setDeleteWorkspaceOpen}
+          workspaceId={Number(selectedWorkspaceId)}
+          workspaceName={workspaceName}
+        />
+      )}
     </div>
   )
 }

@@ -12,6 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
+import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -20,9 +21,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import { KanbanBoard } from "@/components/tasks/kanban-board"
 import { TimeTracker } from "@/components/tasks/time-tracker"
+import { DeleteTaskDialog } from "@/components/tasks/delete-task-dialog"
 import { toast } from "sonner"
 import { AnimatePresence, motion } from "framer-motion"
-import { Calendar, CheckSquare, Filter, Image as ImageIcon, List, MessageSquare, MoreHorizontal, Paperclip, Plus, Search, Tag, Trash2, X } from "lucide-react"
+import { Calendar, CheckSquare, Filter, Image as ImageIcon, List, MessageSquare, MoreHorizontal, Paperclip, Plus, Search, Sparkles, Tag, Trash2, X } from "lucide-react"
 
 interface UserData {
   id: string
@@ -73,6 +75,9 @@ interface Task {
   labels: TaskLabel[]
   subtasksTotal: number
   subtasksCompleted: number
+  aiGenerated?: boolean
+  aiAgentRunId?: number | null
+  aiGoal?: string | null
 }
 
 interface TaskDetail extends Task {
@@ -122,6 +127,23 @@ interface TaskTemplate {
   }
 }
 
+interface GeneratedAiTask {
+  title: string
+  description: string | null
+  priority: "low" | "medium" | "high" | "urgent"
+  dueDate: string | null
+  subtasks: string[]
+}
+
+interface AiTaskGroup {
+  id: number
+  goal: string
+  workspace: string | null
+  total: number
+  completed: number
+  progress: number
+}
+
 const columns = [
   { id: "todo", title: "To Do" },
   { id: "in-progress", title: "In Progress" },
@@ -159,6 +181,7 @@ export default function TasksPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedTask, setSelectedTask] = useState<TaskDetail | null>(null)
   const [taskDetailOpen, setTaskDetailOpen] = useState(false)
+  const [deleteTaskOpen, setDeleteTaskOpen] = useState(false)
   const [newLabelName, setNewLabelName] = useState("")
   const [newCommentBody, setNewCommentBody] = useState("")
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
@@ -166,6 +189,23 @@ export default function TasksPage() {
   const [newDependencyId, setNewDependencyId] = useState("")
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<number>>(new Set())
   const [isBulkActing, setIsBulkActing] = useState(false)
+  const [aiGoal, setAiGoal] = useState("")
+  const [aiWorkspaceId, setAiWorkspaceId] = useState("")
+  const [aiProjectId, setAiProjectId] = useState("none")
+  const [aiDueDateStyle, setAiDueDateStyle] = useState("flexible")
+  const [aiIncludeSubtasks, setAiIncludeSubtasks] = useState(true)
+  const [aiPreview, setAiPreview] = useState<{
+    goal: string
+    workspaceId: number
+    projectId: number | null
+    tasks: GeneratedAiTask[]
+    requiresConfirmation: boolean
+  } | null>(null)
+  const [aiConfirmed, setAiConfirmed] = useState(false)
+  const [aiTaskGroups, setAiTaskGroups] = useState<AiTaskGroup[]>([])
+  const [isCreatingAiTasks, setIsCreatingAiTasks] = useState(false)
+  const [isSavingAiTasks, setIsSavingAiTasks] = useState(false)
+  const [completingAiGroupId, setCompletingAiGroupId] = useState<number | null>(null)
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",
@@ -206,6 +246,12 @@ export default function TasksPage() {
     if (!projectsByWorkspace[workspaceId]) void loadProjects(workspaceId, user.id)
   }, [newTask.workspaceId, user, labelsByWorkspace, membersByWorkspace, projectsByWorkspace])
 
+  useEffect(() => {
+    if (!user?.id || !aiWorkspaceId) return
+    const workspaceId = Number(aiWorkspaceId)
+    if (!projectsByWorkspace[workspaceId]) void loadProjects(workspaceId, user.id)
+  }, [aiWorkspaceId, user, projectsByWorkspace])
+
   const filteredTasks = useMemo(() => (tasks || []).filter((task) => {
     const matchesSearch =
       (task.title || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -244,6 +290,7 @@ export default function TasksPage() {
       if (!workspacesResponse.ok) throw new Error(workspacesData.error)
       setTasks(tasksData.tasks || [])
       setWorkspaces(workspacesData.workspaces || [])
+      void loadAiTaskGroups(userId)
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Could not load tasks")
     } finally {
@@ -425,6 +472,118 @@ export default function TasksPage() {
     setTasks((current) => [{ ...(data.task || {}), workspace: workspace?.name ?? "Workspace", assignee: assigneeName, labels }, ...current])
     setNewTask({ title: "", description: "", workspaceId: "", projectId: "none", assigneeId: "me", priority: "medium", dueDate: "", status: "todo", labelIds: [] })
     setDialogOpen(false)
+  }
+
+  async function loadAiTaskGroups(userId: string) {
+    try {
+      const response = await fetch(`/api/ai-tasks?userId=${userId}`)
+      const data = await response.json()
+      if (response.ok) setAiTaskGroups(data.groups || [])
+    } catch (err) {
+      console.error("Failed to load AI task groups", err)
+    }
+  }
+
+  async function handleCreateAiTasks() {
+    if (!user?.id || !aiGoal.trim()) return
+
+    setIsCreatingAiTasks(true)
+    try {
+      const response = await fetch("/api/ai-tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          action: "preview",
+          goal: aiGoal.trim(),
+          workspaceId: aiWorkspaceId ? Number(aiWorkspaceId) : null,
+          projectId: aiProjectId === "none" ? null : Number(aiProjectId),
+          dueDateStyle: aiDueDateStyle,
+          includeSubtasks: aiIncludeSubtasks,
+        }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        toast.error(data.error ?? "Could not create AI tasks")
+        return
+      }
+
+      setAiPreview(data.preview)
+      setAiConfirmed(false)
+      toast.success(`AI prepared ${data.preview.tasks.length} tasks`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not create AI tasks")
+    } finally {
+      setIsCreatingAiTasks(false)
+    }
+  }
+
+  async function saveAiPreview() {
+    if (!user?.id || !aiPreview) return
+
+    setIsSavingAiTasks(true)
+    try {
+      const response = await fetch("/api/ai-tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          goal: aiPreview.goal,
+          workspaceId: aiPreview.workspaceId,
+          projectId: aiPreview.projectId,
+          tasks: aiPreview.tasks,
+          confirmed: aiConfirmed,
+        }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        toast.error(data.error ?? "Could not save AI tasks")
+        return
+      }
+
+      toast.success(`Saved ${data.plan.tasks.length} AI tasks`)
+      setAiGoal("")
+      setAiProjectId("none")
+      setAiDueDateStyle("flexible")
+      setAiIncludeSubtasks(true)
+      setAiPreview(null)
+      setAiConfirmed(false)
+      await loadData(user.id)
+      await loadAiTaskGroups(user.id)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save AI tasks")
+    } finally {
+      setIsSavingAiTasks(false)
+    }
+  }
+
+  async function completeAiTaskGroup(groupId: number) {
+    if (!user?.id) return
+
+    setCompletingAiGroupId(groupId)
+    try {
+      const response = await fetch("/api/ai-tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, runId: groupId, action: "complete" }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        toast.error(data.error ?? "Could not complete AI goal")
+        return
+      }
+
+      toast.success("AI goal marked complete")
+      await loadData(user.id)
+      await loadAiTaskGroups(user.id)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not complete AI goal")
+    } finally {
+      setCompletingAiGroupId(null)
+    }
   }
 
   async function openTaskDetail(taskId: number) {
@@ -854,6 +1013,135 @@ export default function TasksPage() {
 
       {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Sparkles className="h-4 w-4 text-primary" />
+            AI Task Creator
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Textarea
+            value={aiGoal}
+            onChange={(event) => setAiGoal(event.target.value)}
+            placeholder="Tell AI what you need to do..."
+            className="min-h-24"
+          />
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]">
+            <Select
+              value={aiWorkspaceId}
+              onValueChange={(value) => {
+                setAiWorkspaceId(value)
+                setAiProjectId("none")
+              }}
+            >
+              <SelectTrigger className="w-full"><SelectValue placeholder="Default workspace" /></SelectTrigger>
+              <SelectContent>
+                {workspaces.map((workspace) => (
+                  <SelectItem key={workspace.id} value={String(workspace.id)}>{workspace.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={aiProjectId} onValueChange={setAiProjectId} disabled={!aiWorkspaceId}>
+              <SelectTrigger className="w-full"><SelectValue placeholder="No project" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No Project</SelectItem>
+                {(projectsByWorkspace[Number(aiWorkspaceId)] ?? []).map((project) => (
+                  <SelectItem key={project.id} value={String(project.id)}>{project.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={aiDueDateStyle} onValueChange={setAiDueDateStyle}>
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="flexible">Flexible Dates</SelectItem>
+                <SelectItem value="this-week">This Week</SelectItem>
+                <SelectItem value="none">No Dates</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={handleCreateAiTasks} disabled={isCreatingAiTasks || !aiGoal.trim()} className="gap-2">
+              <Sparkles className="h-4 w-4" />
+              {isCreatingAiTasks ? "Preparing..." : "Preview Tasks"}
+            </Button>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox checked={aiIncludeSubtasks} onCheckedChange={(checked) => setAiIncludeSubtasks(checked === true)} />
+            Create subtasks
+          </label>
+          {aiPreview && (
+            <div className="space-y-3 rounded-lg border border-border p-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-medium">Preview</p>
+                  <p className="text-xs text-muted-foreground">{aiPreview.tasks.length} tasks ready to save</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setAiPreview(null)} disabled={isSavingAiTasks}>Discard</Button>
+                  <Button size="sm" onClick={saveAiPreview} disabled={isSavingAiTasks || (aiPreview.requiresConfirmation && !aiConfirmed)}>
+                    {isSavingAiTasks ? "Saving..." : "Save Tasks"}
+                  </Button>
+                </div>
+              </div>
+              {aiPreview.requiresConfirmation && (
+                <label className="flex items-center gap-2 rounded-md bg-amber-500/10 p-2 text-sm">
+                  <Checkbox checked={aiConfirmed} onCheckedChange={(checked) => setAiConfirmed(checked === true)} />
+                  Confirm this plan before saving
+                </label>
+              )}
+              <div className="grid gap-2">
+                {aiPreview.tasks.map((task, index) => (
+                  <div key={`${task.title}-${index}`} className="rounded-md border border-border p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium">{task.title}</p>
+                      <Badge className={priorityColors[task.priority]}>{task.priority}</Badge>
+                      {task.dueDate && <Badge variant="outline">{task.dueDate}</Badge>}
+                    </div>
+                    {task.description && <p className="mt-1 text-sm text-muted-foreground">{task.description}</p>}
+                    {task.subtasks.length > 0 && (
+                      <p className="mt-2 text-xs text-muted-foreground">{task.subtasks.length} subtasks</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {aiTaskGroups.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Sparkles className="h-4 w-4 text-primary" />
+              AI Goals
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2">
+            {aiTaskGroups.map((group) => (
+              <div key={group.id} className="rounded-lg border border-border p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{group.goal}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {group.completed}/{group.total} tasks done{group.workspace ? ` in ${group.workspace}` : ""}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={group.progress === 100 || completingAiGroupId === group.id}
+                    onClick={() => completeAiTaskGroup(group.id)}
+                  >
+                    Complete
+                  </Button>
+                </div>
+                <Progress value={group.progress} className="mt-3 h-2" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-4">
         <StatCard title="Total Tasks" value={stats.total} />
         <StatCard title="Completed" value={stats.completed} tone="text-green-500" />
@@ -921,6 +1209,7 @@ export default function TasksPage() {
                           <p className={`truncate font-medium ${task.status === "done" ? "line-through" : ""}`}>{task.title}</p>
                           <div className="mt-1 flex flex-wrap items-center gap-2">
                             <span className="text-sm text-muted-foreground">{task.workspace}</span>
+                            {task.aiGenerated && <Badge variant="outline" className="gap-1"><Sparkles className="h-3 w-3" />AI</Badge>}
                             {task.dueDate && <span className="flex items-center text-sm text-muted-foreground"><Calendar className="mr-1 h-3 w-3" />{task.dueDate}</span>}
                             {task.subtasksTotal > 0 && <span className="text-xs text-muted-foreground">{task.subtasksCompleted}/{task.subtasksTotal} subtasks</span>}
                           </div>
@@ -963,6 +1252,7 @@ export default function TasksPage() {
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Badge className={priorityColors[task.priority]}>{task.priority}</Badge>
+                      {task.aiGenerated && <Badge variant="outline">AI</Badge>}
                       {task.labels.slice(0, 2).map((label) => <Badge key={label.id} variant="outline">{label.name}</Badge>)}
                     </div>
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -1022,7 +1312,7 @@ export default function TasksPage() {
                     <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem variant="destructive" onClick={() => deleteTask(selectedTask.id)}>
+                    <DropdownMenuItem variant="destructive" onClick={() => setDeleteTaskOpen(true)}>
                       <Trash2 className="h-4 w-4" />
                       Delete task
                     </DropdownMenuItem>
@@ -1384,6 +1674,22 @@ export default function TasksPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {selectedTask && user && (
+        <DeleteTaskDialog
+          open={deleteTaskOpen}
+          onOpenChange={setDeleteTaskOpen}
+          taskId={selectedTask.id}
+          taskTitle={selectedTask.title}
+          userId={Number(user.id)}
+          onDeleted={() => {
+            setTasks((current) => current.filter((task) => task.id !== selectedTask.id))
+            setTaskDetailOpen(false)
+            setSelectedTask(null)
+            toast.success("Task deleted successfully")
+          }}
+        />
+      )}
     </div>
   )
 }

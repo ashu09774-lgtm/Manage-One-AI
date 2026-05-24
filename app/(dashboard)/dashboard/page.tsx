@@ -118,37 +118,35 @@ export default function DashboardPage() {
   const stats = data?.stats ?? { workspaces: 0, tasks: 0, members: 0, completionRate: 0 }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       {/* Hero Header */}
-      <div className="relative overflow-hidden rounded-3xl border border-border/50 bg-gradient-to-br from-primary/20 via-chart-2/10 to-chart-3/5 p-8 shadow-2xl animate-gradient-shift">
-        <div className="pointer-events-none absolute -right-20 -top-20 h-80 w-80 rounded-full bg-primary/20 blur-[100px] animate-pulse-glow" />
-        <div className="pointer-events-none absolute -bottom-16 -left-16 h-64 w-64 rounded-full bg-chart-2/20 blur-[100px] animate-float-slow" />
+      <div className="relative overflow-hidden rounded-lg border border-border bg-card p-4 shadow-sm sm:p-5">
         
         <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-primary backdrop-blur-md">
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-2 rounded-md border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase text-primary">
               <Sparkles className="h-3.5 w-3.5 animate-pulse" />
               Intelligence Layer Active
             </div>
             <div>
-              <h1 className="text-3xl font-black tracking-tight sm:text-4xl lg:text-5xl">
+              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
                 {greeting()}, <span className="bg-gradient-to-r from-primary to-chart-2 bg-clip-text text-transparent">{user?.name?.split(" ")[0] || "User"}</span> 👋
               </h1>
-              <p className="mt-3 max-w-xl text-lg text-muted-foreground/80 leading-relaxed">
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
                 Your workspace is optimized and synchronized. You have <span className="font-bold text-foreground">{stats.tasks} tasks</span> pending across <span className="font-bold text-foreground">{stats.workspaces} workspaces</span>.
               </p>
             </div>
           </div>
           <div className="flex flex-wrap gap-3">
             <Link href="/dashboard/assistant">
-              <Button size="lg" variant="outline" className="gap-2 rounded-2xl border-primary/20 bg-background/50 text-primary backdrop-blur-md hover:bg-primary/10 hover:border-primary/40 transition-all duration-300">
-                <Bot className="h-5 w-5" />
+              <Button variant="outline" className="gap-2">
+                <Bot className="h-4 w-4" />
                 Assistant
               </Button>
             </Link>
             <Link href="/dashboard/tasks">
-              <Button size="lg" className="gap-2 rounded-2xl bg-primary shadow-xl shadow-primary/30 hover:shadow-primary/50 transition-all duration-500 group">
-                <Plus className="h-5 w-5 transition-transform group-hover:rotate-90" />
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
                 Quick Task
               </Button>
             </Link>
@@ -159,7 +157,7 @@ export default function DashboardPage() {
       {error && <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>}
 
       {/* Metric Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <MetricCard
           title="Active Workspaces"
           value={stats.workspaces}
@@ -202,10 +200,10 @@ export default function DashboardPage() {
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 xl:grid-cols-3">
         {/* Recent Tasks */}
-        <Card className="card-glow lg:col-span-2 overflow-hidden border-border/40 bg-card/40 backdrop-blur-xl transition-all duration-500">
-          <CardHeader className="flex flex-row items-center justify-between border-b border-border/30 pb-6">
+        <Card className="overflow-hidden border-border bg-card py-0 shadow-sm xl:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-border p-4">
             <div>
               <CardTitle className="flex items-center gap-2">
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
@@ -286,8 +284,8 @@ export default function DashboardPage() {
         </Card>
 
         {/* Team Activity */}
-        <Card className="card-glow overflow-hidden border-border/40 bg-card/40 backdrop-blur-xl transition-all duration-500">
-          <CardHeader className="border-b border-border/30 pb-6">
+        <Card className="overflow-hidden border-border bg-card py-0 shadow-sm">
+          <CardHeader className="border-b border-border p-4">
             <CardTitle className="flex items-center gap-2">
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-chart-5/10">
                 <Zap className="h-4 w-4 text-chart-5" />
@@ -344,8 +342,8 @@ export default function DashboardPage() {
       </div>
 
       {/* Active Workspaces */}
-      <Card className="card-glow overflow-hidden border-border/40 bg-card/40 backdrop-blur-xl transition-all duration-500">
-        <CardHeader className="flex flex-row items-center justify-between border-b border-border/30 pb-6">
+      <Card className="overflow-hidden border-border bg-card py-0 shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between border-b border-border p-4">
           <div>
             <CardTitle className="flex items-center gap-2">
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-chart-2/10">
@@ -363,7 +361,7 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="rounded-xl border border-border/40 bg-muted/10 p-5">
                   <div className="mb-4 h-5 w-32 animate-pulse rounded bg-muted" />
@@ -390,7 +388,7 @@ export default function DashboardPage() {
               }
             />
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {data.projects.map((project) => (
                 <div
                   key={project.id}
@@ -459,22 +457,22 @@ function MetricCard({
   className?: string
 }) {
   return (
-    <Card className={cn(`card-glow group relative overflow-hidden bg-gradient-to-br h-full transition-all duration-500 hover:scale-[1.02] ${gradient}`, className)}>
+    <Card className={cn(`group relative h-full overflow-hidden bg-gradient-to-br py-0 shadow-sm transition-colors hover:bg-muted/30 ${gradient}`, className)}>
       {/* Hover glow line */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
 
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
+      <CardHeader className="flex flex-row items-center justify-between p-4 pb-2 sm:p-4">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${iconBg} transition-transform duration-300 group-hover:scale-110`}>
+        <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${iconBg}`}>
           <Icon className="h-4.5 w-4.5" />
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-4 pt-0">
         {isLoading ? (
           <div className="h-8 w-20 animate-pulse rounded-lg bg-muted" />
         ) : (
           <>
-            <div className="text-3xl font-bold tracking-tight flex items-end gap-2">
+            <div className="flex items-end gap-2 text-2xl font-bold tracking-tight sm:text-3xl">
               {value}
               {trend && (
                 <span className="text-xs font-medium text-emerald-500 mb-1">{trend}</span>

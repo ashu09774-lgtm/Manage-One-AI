@@ -22,3 +22,6 @@ public/uploads/task-attachments/*
 # Local database and upload backups
 database/backups/*
 !database/backups/.gitkeep
+
+# Logs
+*.log

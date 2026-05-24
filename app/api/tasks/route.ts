@@ -17,6 +17,9 @@ type TaskRow = RowDataPacket & {
   assignee: string | null
   assigneeId: number | null
   dueDate: string | null
+  aiGenerated: number | boolean
+  aiAgentRunId: number | null
+  aiGoal: string | null
   comments: number
   attachments: number
 }
@@ -53,17 +56,21 @@ export async function GET(request: Request) {
         u.name AS assignee,
         t.assignee_id AS assigneeId,
         DATE_FORMAT(t.due_date, '%Y-%m-%d') AS dueDate,
+        t.ai_generated AS aiGenerated,
+        t.ai_agent_run_id AS aiAgentRunId,
+        ar.goal AS aiGoal,
         COUNT(DISTINCT tc.id) AS comments,
         COUNT(DISTINCT ta.id) AS attachments
       FROM tasks t
       INNER JOIN workspaces w ON w.id = t.workspace_id
       INNER JOIN workspace_members wm ON wm.workspace_id = t.workspace_id AND wm.user_id = ?
       LEFT JOIN projects p ON p.id = t.project_id
+      LEFT JOIN ai_agent_runs ar ON ar.id = t.ai_agent_run_id
       LEFT JOIN users u ON u.id = t.assignee_id
       LEFT JOIN task_comments tc ON tc.task_id = t.id
       LEFT JOIN task_attachments ta ON ta.task_id = t.id
       WHERE 1 = 1 ${workspaceFilter}
-      GROUP BY t.id, t.workspace_id, w.name, t.project_id, p.name, t.title, t.description, t.status, t.priority, u.name, t.assignee_id, t.due_date, t.updated_at
+      GROUP BY t.id, t.workspace_id, w.name, t.project_id, p.name, t.title, t.description, t.status, t.priority, u.name, t.assignee_id, t.due_date, t.ai_generated, t.ai_agent_run_id, ar.goal, t.updated_at
       ORDER BY t.updated_at DESC`,
       params
     )
@@ -124,6 +131,9 @@ export async function GET(request: Request) {
         assignee: task.assignee ? String(task.assignee) : null,
         assigneeId: task.assigneeId ? Number(task.assigneeId) : null,
         dueDate: task.dueDate ? String(task.dueDate) : null,
+        aiGenerated: Boolean(task.aiGenerated),
+        aiAgentRunId: task.aiAgentRunId ? Number(task.aiAgentRunId) : null,
+        aiGoal: task.aiGoal ? String(task.aiGoal) : null,
         comments: Number(task.comments ?? 0),
         attachments: Number(task.attachments ?? 0),
         labels: labelsByTask.get(task.id) ?? [],
